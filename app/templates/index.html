@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}七並べオンライン{% endblock %}
+
+{% block content %}
+<head>
+  <meta charset="utf-8">
+  <title>七並べオンライン</title>
+  <meta name="description" content="七並べをオンラインで全国のプレイヤーと対戦！">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="canonical" href="https://html-mq6q.onrender.com/">
+  <meta name="keywords" content="七並べ, オンライン, カードゲーム, 対戦, 全国, 友人, DOUBLE MINE">
+</head>
+
+<style>
+body {
+  font-family: "Yu Gothic", "Arial", sans-serif;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background-color: #004400;
+  color: white;
+}
+
+/* タイトル */
+.title {
+  margin-top: 100px;
+  font-size: 80px;
+  font-weight: bold;
+  text-shadow: 3px 3px 8px #000;
+  animation: glow 3s infinite alternate;
+}
+@keyframes glow {
+  from { text-shadow: 0 0 10px #fff; }
+  to { text-shadow: 0 0 25px #ff4444, 0 0 50px #ff0000; }
+}
+
+/* サブタイトル */
+.subtitle {
+  font-size: 20px;
+  color: #ffd;
+  margin-bottom: 40px;
+  letter-spacing: 3px;
+}
+
+/* ボタン配置 */
+.menu {
+  display: flex;
+  justify-content: center;
+  gap: 60px;
+  margin-top: 60px;
+}
+
+.menu a {
+  display: block;
+  width: 220px;
+  height: 100px;
+  line-height: 100px;
+  text-decoration: none;
+  font-size: 24px;
+  color: white;
+  font-weight: bold;
+  border: 3px solid white;
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
+  box-shadow: 0 0 20px rgba(255,255,255,0.2);
+}
+.menu a:hover {
+  background-color: rgba(255,255,255,0.2);
+  color: #00ffcc;
+  border-color: #00ffcc;
+  transform: scale(1.1);
+}
+
+/* 背景カードのアニメーション */
+.card {
+  position: absolute;
+  width: 100px;
+  height: 150px;
+  opacity: 0.5;
+  animation: float 10s infinite linear;
+}
+@keyframes float {
+  0% { transform: translateY(0) rotate(0deg); opacity: 0.4; }
+  50% { transform: translateY(-40px) rotate(10deg); opacity: 0.7; }
+  100% { transform: translateY(0) rotate(0deg); opacity: 0.4; }
+}
+
+/* フッター */
+.footer {
+  position: absolute;
+  bottom: 20px;
+  width: 100%;
+  text-align: center;
+  font-size: 14px;
+  color: #ccc;
+}
+</style>
+
+<div class="title">七並べONLINE</div>
+<div class="subtitle">七並べ名人戦</div>
+
+<div class="menu">
+  <a href="/login">全国対戦</a>
+  <a href="/friend">友人対戦</a>
+</div>
+
+<div class="footer">
+  © 2525 DOUBLE MINE PROJECT
+</div>
+
+<script>
+</script>
+{% endblock %}

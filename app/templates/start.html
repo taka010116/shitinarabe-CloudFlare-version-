@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>Demo Site</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background-color: white;
+    }
+
+    /* 赤いボックス */
+    .red-box {
+      position: absolute;
+      top: 50px;
+      left: 100px;
+      width: 380px;
+      height: 150px;
+      background-color: red;
+      color: white;
+      padding: 10px;
+      box-sizing: border-box;
+      z-index: 2; /* 前面に表示 */
+    }
+
+    /* 青いボックス */
+    .blue-box {
+      position: absolute;
+      top: 180px;
+      left: 300px;
+      width: 260px;
+      background-color: blue;
+      color: white;
+      padding: 20px;
+      box-sizing: border-box;
+      z-index: 1; /* 赤の下に少し潜る */
+    }
+
+    /* リンク群 */
+    .blue-box a {
+      display: block;
+      color: white;
+      text-decoration: none;
+      margin: 8px 0;
+    }
+
+    .blue-box a:hover {
+      text-decoration: underline;
+    }
+
+    /* 説明表示ボックス */
+    .desc-box {
+      position: absolute;
+      top: 90px;
+      left: 350px;
+      width: 300px;
+      height: 120px;
+      background-color: lightgray;
+      border: 1px solid #999;
+      padding: 10px;
+      box-sizing: border-box;
+      color: black;
+      z-index: 3; /* 一番上に表示 */
+    }
+
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #f8f5e9;
+      font-family: "Courier New", monospace;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 赤いボックス -->
+  <div class="red-box">
+    *last update: 2005/11/11<br>
+    ブログ設置。しただけ。
+  </div>
+
+  <!-- 青いリンクボックス -->
+  <div class="blue-box">
+    <a href="/issues" data-desc="課題に関するページです。">*issues</a>
+    <a href="/songs" data-desc="楽曲紹介のページです。">*songs</a>
+    <a href="/words" data-desc="言葉や文章のページです。">*words</a>
+    <a href="/lives" data-desc="ライブに関する情報です。">*lives</a>
+    <a href="/nexus" data-desc="リンク集（nexus）です。">*nexus</a>
+    <a href="/notes" data-desc="メモやノートです。">*notes</a>
+  </div>
+
+  <!-- 説明ボックス -->
+  <div class="desc-box" id="desc-box">
+    カーソルを合わせると説明がここに表示されます。
+  </div>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const links = document.querySelectorAll(".blue-box a");
+    const descBox = document.getElementById("desc-box");
+
+    links.forEach(link => {
+      link.addEventListener("mouseover", () => {
+        descBox.textContent = link.dataset.desc;
+      });
+      link.addEventListener("mouseout", () => {
+        descBox.textContent = "カーソルを合わせると説明がここに表示されます。";
+      });
+    });
+
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    // 背景文字を生成
+    const chars = "国士無双二盃口七対子立直四暗刻単騎大三元字一色一".split("");
+    const floatingTexts = [];
+    for (let i = 0; i < 200; i++) {
+      floatingTexts.push({
+        char: chars[Math.floor(Math.random() * chars.length)],
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: 12 + Math.random() * 24,
+        speedX: -0.5 + Math.random(),
+        speedY: -0.5 + Math.random(),
+        alpha: 0.2 + Math.random() * 0.5
+      });
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 背景文字
+      for (let t of floatingTexts) {
+        ctx.fillStyle = `rgba(0,0,0,${t.alpha})`;
+        ctx.font = `${t.size}px Courier New`;
+        ctx.fillText(t.char, t.x, t.y);
+
+        t.x += t.speedX;
+        t.y += t.speedY;
+
+        if (t.x > canvas.width) t.x = 0;
+        if (t.x < 0) t.x = canvas.width;
+        if (t.y > canvas.height) t.y = 0;
+        if (t.y < 0) t.y = canvas.height;
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    draw();
+  </script>
+</body>
+</html>

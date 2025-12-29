@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>麻雀プログラム</title>
+<style>
+  body { font-family: "Segoe UI Emoji", sans-serif; text-align: center; background-color: #fafafa; }
+  .tile { font-size: 32px; cursor: pointer; margin: 3px; display: inline-block; }
+  .highlight { background-color: yellow; border-radius: 5px; padding: 2px; }
+  #hand { margin-top: 15px; }
+  #info { margin-top: 20px; font-size: 18px; }
+  button { margin: 5px; font-size: 18px; padding: 5px 10px; }
+</style>
+</head>
+<body>
+<h1>🀄 麻雀プログラム</h1>
+
+<div>
+  <button onclick="deal()">配牌する</button>
+  <button onclick="draw()">自摸</button>
+  <button onclick="sortHand()">理牌する</button>
+</div>
+
+<div id="info"></div>
+<div id="dora"></div>
+<div id="hand"></div>
+
+<script>
+const suits = ["m", "p", "s"]; // 萬子, 筒子, 索子
+const honors = ["東", "南", "西", "北", "白", "發", "中"];
+const emojiMap = {
+  "1m":"🀇","2m":"🀈","3m":"🀉","4m":"🀊","5m":"🀋","6m":"🀌","7m":"🀍","8m":"🀎","9m":"🀏",
+  "1p":"🀙","2p":"🀚","3p":"🀛","4p":"🀜","5p":"🀝","6p":"🀞","7p":"🀟","8p":"🀠","9p":"🀡",
+  "1s":"🀐","2s":"🀑","3s":"🀒","4s":"🀓","5s":"🀔","6s":"🀕","7s":"🀖","8s":"🀗","9s":"🀘",
+  "東":"🀀","南":"🀁","西":"🀂","北":"🀃","白":"🀄","發":"🀅","中":"🀆"
+};
+
+let wall = [];
+let hand = [];
+let dora = null;
+
+function makeWall() {
+  wall = [];
+  for (let s of suits) {
+    for (let n = 1; n <= 9; n++) {
+      for (let i = 0; i < 4; i++) wall.push(n + s);
+    }
+  }
+  for (let h of honors) {
+    for (let i = 0; i < 4; i++) wall.push(h);
+  }
+  shuffle(wall);
+}
+
+function shuffle(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+
+function deal() {
+  makeWall();
+  hand = wall.splice(0, 13);
+  dora = wall.splice(0, 1)[0];
+  updateDisplay();
+}
+
+function sortHand() {
+  const order = "mps東南西北白發中";
+  hand.sort((a,b)=> order.indexOf(a[a.length-1]) - order.indexOf(b[b.length-1]) || a.localeCompare(b));
+  updateDisplay();
+}
+
+function draw() {
+  if (wall.length === 0) return;
+  const newTile = wall.shift();
+  hand.push(newTile);
+  updateDisplay();
+}
+
+function discard(tile) {
+  hand.splice(hand.indexOf(tile), 1);
+  updateDisplay();
+}
+
+function updateDisplay() {
+  const handDiv = document.getElementById("hand");
+  handDiv.innerHTML = "";
+  hand.forEach(t => {
+    const span = document.createElement("span");
+    span.className = "tile";
+    span.textContent = emojiMap[t];
+    span.onclick = () => discard(t);
+    handDiv.appendChild(span);
+  });
+  document.getElementById("dora").innerHTML = `ドラ表示牌: ${emojiMap[dora]}`;
+  document.getElementById("info").innerHTML = analyzeHand(hand);
+}
+
+function analyzeHand(h) {
+  const melds = countMelds([...h]);
+  const yaku = detectYaku(h);
+  const tenpaiInfo = checkTenpai(h);
+
+  let result = `面子候補: ${melds}　役: ${yaku.join(" / ") || "なし"}`;
+  if (tenpaiInfo.isTenpai)
+    result += `<br><span class='highlight'>聴牌！ 待ち牌: ${tenpaiInfo.waits.map(x=>emojiMap[x]).join(" ")}</span>`;
+  else result += "<br>聴牌していません";
+  return result;
+}
+
+// 面子を数える（順子＋刻子）
+function countMelds(tiles) {
+  tiles.sort();
+  let count = 0;
+  // 刻子
+  for (let t of [...new Set(tiles)]) {
+    const same = tiles.filter(x=>x===t);
+    if (same.length >= 3) {
+      count++;
+      for (let i=0;i<3;i++) tiles.splice(tiles.indexOf(t),1);
+    }
+  }
+  // 順子
+  for (let s of suits) {
+    for (let n=1;n<=7;n++) {
+      while(tiles.includes(n+s)&&tiles.includes((n+1)+s)&&tiles.includes((n+2)+s)) {
+        count++;
+        tiles.splice(tiles.indexOf(n+s),1);
+        tiles.splice(tiles.indexOf((n+1)+s),1);
+        tiles.splice(tiles.indexOf((n+2)+s),1);
+      }
+    }
+  }
+  return count;
+}
+
+// 役の判定
+function detectYaku(tiles) {
+  const yaku = [];
+  // タンヤオ：1,9,字牌がない
+  if (tiles.every(t => {
+    if (honors.includes(t)) return false;
+    const num = parseInt(t);
+    return num>=2 && num<=8;
+  })) yaku.push("タンヤオ");
+
+  // 役牌
+  if (tiles.filter(t => ["白","發","中"].includes(t)).length >= 3)
+    yaku.push("役牌");
+
+  // ピンフ：すべて順子＋雀頭が数牌（簡易）
+  if (tiles.every(t => !honors.includes(t))) yaku.push("ピンフ");
+
+  return yaku;
+}
+
+// 聴牌チェック
+function checkTenpai(tiles) {
+  const allTiles = new Set([...wall, ...hand, dora]);
+  const waits = [];
+  for (let t of allTiles) {
+    if (tiles.filter(x=>x===t).length >= 4) continue; // 枚数制限
+    const newHand = [...tiles, t];
+    if (isWinningHand(newHand)) waits.push(t);
+  }
+  return { isTenpai: waits.length>0, waits };
+}
+
+// 和了判定：4面子＋1雀頭（13枚+1）
+function isWinningHand(tiles) {
+  if (tiles.length !== 14) return false;
+  tiles.sort();
+  for (let i=0; i<tiles.length-1; i++) {
+    if (tiles[i] === tiles[i+1]) {
+      const rest = tiles.slice(0,i).concat(tiles.slice(i+2));
+      if (canFormMelds(rest)) return true;
+    }
+  }
+  return false;
+}
+
+function canFormMelds(tiles) {
+  if (tiles.length === 0) return true;
+  tiles.sort();
+  const t = tiles[0];
+  const same = tiles.filter(x=>x===t);
+  if (same.length >= 3) {
+    const newTiles = [...tiles];
+    for (let i=0;i<3;i++) newTiles.splice(newTiles.indexOf(t),1);
+    if (canFormMelds(newTiles)) return true;
+  }
+  if (!honors.includes(t)) {
+    const num = parseInt(t);
+    const suit = t[t.length-1];
+    if (tiles.includes((num+1)+suit) && tiles.includes((num+2)+suit)) {
+      const newTiles = [...tiles];
+      [t,(num+1)+suit,(num+2)+suit].forEach(x=> newTiles.splice(newTiles.indexOf(x),1));
+      if (canFormMelds(newTiles)) return true;
+    }
+  }
+  return false;
+}
+</script>
+</body>
+</html>

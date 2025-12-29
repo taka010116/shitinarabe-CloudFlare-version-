@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>test</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; }
+    #cards { display: flex; justify-content: center; margin: 20px; }
+    .card {
+      width: 80px; height: 120px;
+      border: 2px solid black; margin: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2em; cursor: pointer;
+      background-color: white;
+    }
+    .selected { background-color: lightblue; }
+    #submitBtn { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>DOUBLE MINES</h1>
+  <div id="cards"></div>
+  <div id="result"></div>
+  <button id="submitBtn" disabled>選択を送信</button>
+  <p id="status"></p>
+
+  <!-- <script src="/socket.io/socket.io.js"></script> -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
+
+  <script>
+    const socket = io("https://html-mq6q.onrender.com", {
+      transports: ["websocket", "polling"],
+    });
+    const cardsDiv = document.getElementById("cards");
+    const submitBtn = document.getElementById("submitBtn");
+    const status = document.getElementById("status");
+    const resultDiv = document.getElementById("result");
+
+    let isLeader = false;
+    let currentPassword = localStorage.getItem("gamePassword");
+    let selectedCards = [];
+    let cardNumbers = [];
+    let round = 1;
+    let myScore = 0;
+    //直した。
+    let opponentScore = 0;
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.has("password")) {
+      currentPassword = params.get("password");
+      localStorage.setItem("gamePassword", currentPassword);
+    }
+    console.log("使用するパスワード:", currentPassword);
+    
+
+    const scoreDiv = document.createElement("div");
+    scoreDiv.id = "scoreDiv";
+    scoreDiv.style.margin = "10px";
+    document.body.appendChild(scoreDiv);
+
+    function updateScoreboard() {
+      scoreDiv.innerHTML = `
+        <h3>ラウンド ${round}</h3>
+        <p>あなたのスコア: ${myScore}</p>
+        <p>相手のスコア: ${opponentScore}</p>
+        <p>現在の役割: <strong>${isLeader ? "防衛" : "攻撃"}</strong></p>
+      `;
+    }
+    //let currentPassword = localStorage.getItem("password");
+
+    // ゲーム参加
+    console.log("パスワード : " , currentPassword);
+    //socket.emit("join_game", { password: currentPassword });
+    socket.emit("join_game", { password: currentPassword });
+    console.log("join game ");
+    
+    socket.on("role", data => {
+      console.log("role 受信 : ", data);
+      console.log("部屋受信 : ", data);
+      resultDiv.innerHTML = "";
+      isLeader = data.isLeader;   // True/False が必ず入るようになる
+      if (isLeader) {
+        status.textContent = "あなたは防衛側です。防衛するカードを2枚選んでください。";
+        cardNumbers = generateCards();
+        renderCards(cardNumbers);
+      } else {
+        status.textContent = "あなたは攻撃側です。防衛側の選択待ち…";
+      }
+    });
+
+
+    // 子にカードが送られてきた
+    socket.on("show_cards", (data) => {
+      console.log("data : " , data);
+      console.log("show_cards まで");
+      cardNumbers = data.cards;
+      //renderCards(cardNumbers);
+      renderCards(data.cards);
+      status.textContent = "カードを2枚選んでください。";
+    });
+
+    socket.on("wait_for_parent", () => {
+      cardsDiv.innerHTML = "";
+      status.textContent = "防衛側の選択待ち…";
+    });
+
+    socket.on("hide_cards", () => {
+      //console.log("カードを隠した");
+      //document.getElementById("cards-area").style.display = "none";
+    });
+
+
+    // 親・子共通: 選択
+    function renderCards(numbers){
+      cardsDiv.innerHTML = "";
+      selectedCards = [];
+      numbers.forEach(num => {
+        const div = document.createElement("div");
+        div.classList.add("card");
+        div.textContent = num;
+
+        div.style.position = "relative";
+
+         // オーバーレイ画像を作成（初期は非表示）
+        const img = document.createElement("img");
+        img.style.position = "absolute";
+        //img.style.top = "50%";
+        //img.style.left = "50%";
+        img.style.width = "50%";
+        img.style.height = "auto";
+        //img.style.transform = "translate(-50%, -50%)"; // 中央に配置
+        img.style.opacity = "0.7"; 
+        img.style.pointerEvents = "none";
+        img.src = ""; // 初期は空
+        div.appendChild(img);
+
+        div.addEventListener("click", () => toggleSelect(div, num, img));
+        cardsDiv.appendChild(div);
+      });
+      submitBtn.disabled = true;
+    }
+
+    function toggleSelect(cardEl, num, imgEl){
+      if(selectedCards.includes(num)){
+        selectedCards = selectedCards.filter(n => n !== num);
+        cardEl.classList.remove("selected");
+        imgEl.src = ""; // 画像削除
+      } else {
+        if(selectedCards.length < 2){
+          selectedCards.push(num);
+          cardEl.classList.add("selected");
+
+         if(isLeader){
+           imgEl.src = "/static/images/thunder.png";
+           imgEl.style.top = "auto";
+           imgEl.style.left = "auto";
+            imgEl.style.bottom = "5%";
+            imgEl.style.right = "5%";
+            imgEl.style.transform = "none";
+          } else {
+            imgEl.src = "/static/images/human.png";
+            imgEl.style.top = "5%";
+            imgEl.style.left = "5%";
+            imgEl.style.bottom = "auto";
+            imgEl.style.right = "auto";
+            imgEl.style.transform = "none";
+          }
+        }
+      }
+
+      submitBtn.disabled = (selectedCards.length !== 2);
+    }
+    // 選択送信ボタン
+    
+    submitBtn.addEventListener("click", () => {
+      if(isLeader){
+        // 親 → 自分の選択とカードをサーバーに送る
+        socket.emit("parent_choice", { password: currentPassword, cards: cardNumbers, chosen: selectedCards });
+        status.textContent = "子の選択待ち…";
+        console.log("サーバーに送信した");
+
+        cardsDiv.querySelectorAll(".card").forEach(card => {
+        card.style.pointerEvents = "none"; 
+        card.style.opacity = 0.5;
+        });
+        submitBtn.disabled = true;
+      } else {
+        // 子 → 自分の選択を送る
+        const chosen = Array.from(document.querySelectorAll(".card.selected")).map(c => c.textContent);
+        socket.emit("child_choice", { password: currentPassword, chosen: chosen });
+        //socket.emit("child_choice", { password: currentPassword, choice: selectedCards });
+        status.textContent = "親と子の結果を待ち…";
+      }
+      submitBtn.disabled = true;
+    });
+
+    socket.on("round_result", (data) => {
+      const { parent_choice, child_choice, score_child, round_cards } = data;
+      
+      resultDiv.innerHTML = "";
+
+      // カードコンテナを先に作成して append
+      const cardsContainer = document.createElement("div");
+      cardsContainer.id = "result-cards";
+      cardsContainer.style.display = "flex";
+      cardsContainer.style.justifyContent = "center";
+      cardsContainer.style.gap = "10px";
+      cardsContainer.style.flexWrap = "wrap";
+      resultDiv.appendChild(cardsContainer);
+      cardsDiv.innerHTML = "";
+
+      round_cards.forEach(num => {
+        const div = document.createElement("div");
+        div.classList.add("card");
+        div.style.position = "relative";
+        div.style.width = "80px";  // カード幅
+        div.style.height = "120px"; // カード高さ
+        div.style.display = "flex";
+        div.style.alignItems = "center";
+        div.style.justifyContent = "center";
+        div.style.fontSize = "24px";
+        div.style.fontWeight = "bold";
+        div.textContent = num;
+
+        if(parent_choice.map(String).includes(String(num))) {
+          const img = document.createElement("img");
+          img.src = "/static/images/thunder.png";
+          img.style.position = "absolute";
+          img.style.width = "50%";
+          img.style.height = "auto";
+          img.style.opacity = "0.7";
+          img.style.bottom = "5%";
+          img.style.right = "5%";
+          img.style.pointerEvents = "none";
+          div.appendChild(img);
+        }
+
+        // 攻撃側オーバーレイ
+        if(child_choice.map(String).includes(String(num))) {
+          const img = document.createElement("img");
+          img.src = "/static/images/human.png";
+          img.style.position = "absolute";
+          img.style.width = "50%";
+          img.style.height = "auto";
+          img.style.opacity = "0.7";
+          img.style.top = "5%";
+          img.style.left = "5%";
+          img.style.pointerEvents = "none";
+          div.appendChild(img);
+        }
+
+        cardsContainer.appendChild(div);
+      });
+      const resultText = document.createElement("div");
+
+      console.log("攻撃側の得点", score_child);
+      console.log("防衛側の選択", parent_choice);
+
+      let score_parent = 0; 
+      if( score_child === 0){
+        score_parent = 10;
+        resultText.innerHTML = `
+        <p>防衛側の選んだカード: ${parent_choice.join(", ")}</p>
+        <p>攻撃側の選んだカード: ${child_choice.join(", ")}</p>
+        <p>攻撃側の得点: ${score_child}</p>
+        <p>防御側ボーナス: ${score_parent}</p>
+      `;
+      }else{
+        resultText.innerHTML = `
+        <p>防衛側の選んだカード: ${parent_choice.join(", ")}</p>
+        <p>攻撃側の選んだカード: ${child_choice.join(", ")}</p>
+        <p>攻撃側の得点: ${score_child}</p>
+      `;
+      }
+      resultText.style.textAlign = "center";
+      resultText.style.marginTop = "10px";
+
+      resultDiv.appendChild(resultText);
+
+      if (isLeader) {
+        opponentScore += score_child;
+        myScore += score_parent;
+      } else {
+        myScore += score_child;
+        opponentScore += score_parent;
+      }
+
+      updateScoreboard();
+
+      if (myScore >= 50 || opponentScore >= 50) {
+        status.textContent = "ゲーム終了";
+        resultDiv.innerHTML += `
+          <h2>最終結果</h2>
+          <p>あなたのスコア: ${myScore}</p>
+          <p>相手のスコア: ${opponentScore}</p>
+          <p>${myScore > opponentScore ? "あなたの勝ちです。" : (myScore === opponentScore ? "引き分け！" : "あなたの負けです。")}</p>
+        `;
+        // 次ラウンドボタンを消す
+        const nextBtn = document.getElementById("nextBtn");
+        if (nextBtn) nextBtn.remove();
+
+        const restartBtn = document.createElement("button");
+        restartBtn.textContent = "もう一度やりますか？";
+        restartBtn.id = "restartBtn";
+        restartBtn.style.marginTop = "20px";
+        document.body.appendChild(restartBtn);
+        if( isLeader ){
+        restartBtn.addEventListener("click", () => {
+          // スコアとラウンドをリセット
+          myScore = 0;
+          opponentScore = 0;
+          round = 1;
+          resultDiv.innerHTML = "";
+          status.textContent = "";
+          restartBtn.remove();
+          socket.emit("next_round", { password: currentPassword });
+        });
+        }
+      }
+
+      if (isLeader) {
+        const nextBtn = document.createElement("button");
+        nextBtn.textContent = "次のラウンドへ ▶";
+        nextBtn.id = "nextBtn";
+        document.body.appendChild(nextBtn);
+
+        nextBtn.addEventListener("click", () => {
+          socket.emit("next_round", { password: currentPassword });
+          nextBtn.remove();
+          resultDiv.innerHTML = "";
+          round++;
+          isLeader = !isLeader;
+          updateScoreboard();
+        });
+      } else {
+        status.textContent = "防衛側が次のラウンドを開始します…";
+      }
+    });
+
+    function nextRound() {
+      round++;
+      isLeader = !isLeader;
+      electedCards = [];
+      resultDiv.innerHTML = "";
+
+      if (round > 10) {
+        showFinalResult();
+        return;
+      }
+
+      cardNumbers = generateCards();
+      renderCards(cardNumbers);
+
+      if (isLeader) {
+        status.textContent = `第${round}ラウンド：あなたは防衛側です。2枚選んでください。`;
+      } else {
+        status.textContent = `第${round}ラウンド：あなたは攻撃側です。防衛側の選択待ち…`;
+        socket.emit("request_cards", { password: currentPassword });
+      }
+
+      updateScoreboard();
+    }
+
+    // 10ラウンド終了後
+    function showFinalResult() {
+      status.textContent = "ゲーム終了";
+      resultDiv.innerHTML = `
+        <h2>最終結果</h2>
+        <p>あなたのスコア: ${myScore}</p>
+        <p>相手のスコア: ${opponentScore}</p>
+        <p>${myScore > opponentScore ? "あなたの勝ちです" : (myScore === opponentScore ? "引き分け！" : "あなたの負けです。")}</p>
+      `;
+    }
+
+    socket.on("game_result", data => {
+      status.textContent = `結果: 防衛側 ${data.parent}, 攻撃側 ${data.child}, 攻撃側の得点: ${data.score}`;
+    });
+
+    function generateCards(){
+      let nums = [];
+      while(nums.length < 4){
+        let r = Math.floor(Math.random()*9)+1;
+        if(!nums.includes(r)) nums.push(r);
+      }
+      return nums;
+    }
+  </script>
+</body>
+</html>

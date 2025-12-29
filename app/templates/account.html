@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>アカウント情報</title>
+  <style>
+    body {
+      font-family: "メイリオ", sans-serif;
+      background-color: #f5f5f5;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .container {
+      background-color: white;
+      display: inline-block;
+      padding: 30px 50px;
+      border-radius: 15px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    .avatar {
+      font-size: 60px;
+      margin: 10px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .avatar:hover {
+      transform: scale(1.2);
+    }
+
+    .selected {
+      border: 3px solid #4CAF50;
+      border-radius: 50%;
+      padding: 10px;
+    }
+
+    textarea {
+      width: 80%;
+      height: 100px;
+      resize: none;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      border: none;
+      background-color: #4CAF50;
+      color: white;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    .stats {
+      margin-top: 20px;
+      font-size: 18px;
+    }
+
+    .delete {
+      background-color: #e74c3c;
+    }
+
+    .delete:hover {
+      background-color: #c0392b;
+    }
+  </style>
+  <script>
+    function selectAvatar(face) {
+      document.getElementById('avatarInput').value = face;
+      document.querySelectorAll('.avatar').forEach(el => el.classList.remove('selected'));
+      document.getElementById('avatar_' + face).classList.add('selected');
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h1>こんにちは、{{ username }} さん</h1>
+
+    <h3>現在のアバター：</h3>
+    <p style="font-size:40px;">{{ avatar }}</p>
+
+    <form action="{{ url_for('main.update_account') }}" method="POST">
+      <!-- <h3>アバターを選択：</h3>
+      <div>
+        <span id="avatar_(´・ω・`)" class="avatar" onclick="selectAvatar('(´・ω・`)')">(´・ω・`)</span>
+        <span id="avatar_('ω')" class="avatar" onclick="selectAvatar('(iωi)')">('ω')</span>
+        <span id="avatar_(;∀;)" class="avatar" onclick="selectAvatar('( ;∀;)')">( ;∀;)</span>
+      </div>
+    
+      <input type="hidden" id="avatarInput" name="avatar" value="{{ avatar }}">
+-->
+      <h3>自己紹介文（100文字まで）：</h3>
+      <textarea name="bio" maxlength="100">{{ bio }}</textarea>
+      <br>
+      <button type="submit">変更を保存</button>
+    </form>
+
+
+    <div class="stats">
+      <h3>勝敗情報：</h3>
+      <p>勝利：{{ wins }}　敗北：{{ losses }}　引き分け：{{ draws }}</p>
+    </div>
+
+    <form action="{{ url_for('main.delete_account') }}" method="POST">
+      <button type="submit" class="delete">アカウント削除</button>
+    </form>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul>{% for msg in messages %}<li>{{ msg }}</li>{% endfor %}</ul>
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <form action="{{ url_for('main.lobby') }}" method="get">
+        <button type="submit">対局開始</button>
+    </form>
+</body>
+</html>

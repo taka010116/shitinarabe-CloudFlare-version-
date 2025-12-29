@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>ロビー</title>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    body {
+      text-align: center;
+      font-family: "メイリオ", sans-serif;
+      background-color: #f0f0f0;
+    }
+    .container {
+      background: white;
+      display: inline-block;
+      padding: 40px;
+      margin-top: 100px;
+      border-radius: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+    h1 {
+      color: #333;
+    }
+    #status, #playerCount {
+      margin-top: 20px;
+      font-size: 20px;
+      color: #666;
+    }
+    #playerCount {
+      font-weight: bold;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>ロビー</h1>
+    <p>マッチング中です...（最大4人）</p>
+    <p id="playerCount">現在のロビー人数: 1人</p>
+    <p id="status">他のプレイヤーを待っています...</p>
+  </div>
+
+  <script>
+        const socket = io("https://shitinarabe.onrender.com/");
+
+        // 現在のユーザー名
+        const username = "{{ session['username'] }}";
+
+
+        // サーバーに参加通知を送る
+        socket.emit("join_lobby", { username });
+
+        // ロビー情報更新時
+        /*
+        socket.on("update_lobby_info", data => {
+            document.getElementById("playerCount").textContent = data.count;
+            const list = document.getElementById("playerList");
+            list.innerHTML = "";
+            data.players.forEach(p => {
+                const li = document.createElement("li");
+                li.textContent = p;
+                list.appendChild(li);
+            });
+        });
+        */
+
+        // ロビー情報更新時
+        socket.on("update_lobby_info", data => {
+    const playerCountElem = document.getElementById("playerCount");
+    const playerListElem = document.getElementById("playerList");
+
+    if (playerCountElem) playerCountElem.textContent = data.count + "人が待機中...";
+    if (playerListElem) {
+        playerListElem.innerHTML = "";
+        data.players.forEach(p => {
+            const li = document.createElement("li");
+            li.textContent = p;
+            playerListElem.appendChild(li);
+        });
+    }
+});
+      
+        // 対局開始ボタン
+
+        // ゲーム開始通知
+        socket.on("match_found", data => {
+          //alert(`対局開始！参加者: ${data.players.join(", ")}`);
+          console.log("📡 対局開始イベントを受信しました:");
+          console.log("受信データ:", data); // ← data全体を表示
+          console.log("ルームID:", data.room_id);
+          console.log("参加者一覧:", data.players);
+          const roomUrl = `/game?room_id=${encodeURIComponent(data.room_id)}`;
+          window.location.href = roomUrl;
+
+        });
+
+        // ページを離れるときに退出を通知
+        window.addEventListener("beforeunload", () => {
+            socket.emit("leave_lobby", { username });
+        });
+    </script>
+</body>
+</html>

@@ -7,7 +7,7 @@ export class ShichinarabeGame {
     this.passes = {};
     this.ranks = [];
     this.dead = new Set();
-    
+
     this.table = {
       hearts: Array(13).fill(null),
       spades: Array(13).fill(null),
@@ -107,16 +107,24 @@ export class ShichinarabeGame {
 
   pass(name) {
     this.passes[name]++;
-
     const playable = this.getPlayable(name);
 
-    // ★ パス3回 & 出せるカードなし → 死亡
     if (this.passes[name] >= 3 && playable.length === 0) {
       this.die(name);
       return;
     }
 
     this.nextTurn();
+  }
+
+  //降参
+  resign(name) {
+    //const playable = this.getPlayable(name);
+
+    //if (playable.length > 0) return;
+
+    this.passes[name] = 3;
+    this.die(name);
   }
 
   die(name) {
@@ -132,16 +140,20 @@ export class ShichinarabeGame {
     this.ranks.unshift(name); // ★ 最下位に追加
 
     // ③ プレイヤーから除外
+    const deadIndex = this.players.indexOf(name);
     this.players = this.players.filter(p => p !== name);
     this.dead.add(name);
 
     // ④ ターン調整
     if (this.players.length > 0) {
-      this.turnIndex %= this.players.length;
+      if (deadIndex <= this.turnIndex) {
+        this.turnIndex--;
+      }
+      this.turnIndex = (this.turnIndex + this.players.length) % this.players.length;
     }
 
     // ⑤ 全体更新
-    this.broadcast();
+    //this.broadcast();
   }
 
   nextTurn() {

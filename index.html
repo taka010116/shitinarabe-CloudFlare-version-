@@ -31,11 +31,26 @@ button { margin-top:15px; cursor:pointer; }
 
 #waiting, #game { display:none; }
 
+#game {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 15px;
+
+  width: 100vw;
+  box-sizing: border-box;
+
+  overflow: hidden;   /* ← スクロール完全禁止 */
+}
+
 #table {
   display: grid;
-  grid-template-columns: repeat(13, 60px);
-  grid-template-rows: repeat(4, 90px);
-  gap: 6px;
+  grid-template-columns: repeat(13, 52px);
+  grid-template-rows: repeat(4, 78px);
+  gap: 4px;
   justify-content: center;
   margin: 30px auto;
   background:#0b6623;
@@ -44,7 +59,7 @@ button { margin-top:15px; cursor:pointer; }
 }
 
 .slot {
-  width:60px; height:90px;
+  width:52px; height:78px;
   background:#0a3;
   border-radius:6px;
   display:flex;
@@ -53,18 +68,81 @@ button { margin-top:15px; cursor:pointer; }
 }
 
 .hand-card {
-  width:60px;
-  height:90px;
+  width:52px;
+  height:78px;
   cursor:pointer;
   transition:transform .15s;
 }
 .hand-card:hover { transform:translateY(-6px); }
+
+.game-layout {
+  display: flex;
+  flex-direction: row; 
+  gap: 20px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.game-main {
+  /* flex: 1; */
+  flex: 0 0 auto; 
+  min-width: 700px;
+}
+
+.chat-panel {
+  position: fixed;      /* ← レイアウトから完全に切り離す */
+  top: 20px;            /* ← 右上からの距離 */
+  right: 20px;
+
+  width: 260px;
+  height: 520px;
+
+  background: rgba(0,0,0,0.7);
+  border-radius: 8px;
+  padding: 10px;
+
+  display: flex;
+  flex-direction: column;
+
+  z-index: 1000;        /* ← ゲームより必ず前 */
+}
+
+
+.chat-panel h3 {
+  margin: 0 0 8px 0;
+  text-align: center;
+}
+
+#chat-log {
+  flex: 1;
+  background: rgba(0,0,0,0.2);
+  border-radius: 6px;
+  padding: 8px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+#game.panel {
+  max-width: none;
+}
+
+.chat-box {
+  width: 260px;
+  height: 520px;
+  background: rgba(0,0,0,0.35);
+  border-radius: 8px;
+  padding: 10px;
+  overflow-y: auto;
+  flex-shrink: 0;        /* ← 絶対に縮まない */
+}
+
 </style>
 </head>
 
 <body>
 
-<h1>七並べ ONLINE</h1>
+
 
 <!-- ===== lobby ===== -->
 <div id="login" class="panel">
@@ -86,13 +164,25 @@ button { margin-top:15px; cursor:pointer; }
 </div>
 
 <!-- ===== game ===== -->
-<div id="game" class="panel">
-  <div id="players-ui" style="display:flex;gap:20px;justify-content:center;"></div>
-  <div id="table"></div>
-  <h3>あなたの手札</h3>
-  <div id="hand" style="display:flex;gap:6px;justify-content:center;"></div>
-  <button id="pass-btn" style="display:none;">パス</button>
+<div id="game" class="panel game-layout">
+
+  <!-- ===== 左：ゲーム ===== -->
+  <div class="game-main">
+    <div id="players-ui" style="display:flex;gap:20px;justify-content:center;"></div>
+    <div id="table"></div>
+    <h3>あなたの手札</h3>
+    <div id="hand" style="display:flex;gap:6px;justify-content:center;"></div>
+    <button id="pass-btn" style="display:none;">パス</button>
+  </div>
+
+  <!-- ===== 右：チャット ===== -->
+  <div class="chat-panel">
+    <h3>Chat Log</h3>
+    <div id="chat-log"></div>
+  </div>
+
 </div>
+
 
 <script>
 let ws;
@@ -133,6 +223,11 @@ const playerCount = document.getElementById("playerCount");
 
 /* ===== 受信 ===== */
 function handleMessage(msg) {
+  if (msg.type === "chat") {
+    addChat(msg.text);
+    return;
+  }
+
   if (msg.type === "waiting") {
     status.textContent = `待機中 ${msg.current}/${msg.max}`;
   }
@@ -223,31 +318,67 @@ function updateTable(d){
   });
 }
 
+let myPass = 0;
+
+let lastTurnData = null;
 /* ===== turn ===== */
 function updateTurn(d){
+  lastTurnData = d;
   playersUi.innerHTML="";
   d.players.forEach(p=>{
     const div=document.createElement("div");
-    div.innerHTML=`<b style="color:${p===d.player?'red':'white'}">${p}</b><br>残り:${d.hand_counts[p]}`;
+    div.innerHTML = `
+      <b style="color:${p===d.player ? 'red' : 'white'}">${p}</b><br>
+      残り: ${d.hand_counts[p]}<br>
+      パス: ${d.passes[p] ?? 0}/3
+    `;
     playersUi.appendChild(div);
   });
+  
+  myPass = d.passes[myName] ?? 0;
+  const isMyTurn = d.player === myName;
+  if (!isMyTurn) {
+   passBtn.disabled = true;
+    passBtn.textContent = "パス";
+  } else if (myPass >= 2) {
+    passBtn.disabled = false;
+        passBtn.textContent = "降参";
+  } else {
+    passBtn.disabled = false;
+    passBtn.textContent = "パス";
+  }
   passBtn.style.display=(d.player===myName)?"block":"none";
 }
 const playersUi=document.getElementById("players-ui");
 const passBtn=document.getElementById("pass-btn");
+
+
 passBtn.onclick = () => {
-  /*
-  safeSend(JSON.stringify({
-    type: "pass_turn",
+  if( myPass >= 2 ){
+  safeSend({
+    type: "resign",
     username: myName
-  }));
-  */
+  });
+} else {
   safeSend({
     type: "pass_turn",
     username: myName
-  });
+  })
+};
 
 };
+
+
+const chatLog = document.getElementById("chat-log");
+
+function addChat(text) {
+  const div = document.createElement("div");
+  div.textContent = text;
+  chatLog.appendChild(div);
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+
 </script>
 
 </body>

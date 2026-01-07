@@ -30,7 +30,7 @@ export class ShichinarabeRoom {
       const msg = JSON.parse(e.data);
 
       if (msg.type === "join_game") {
-        console.log("ゲームに参加");
+        this.sendChat("Server> ゲーム開始します。");
         this.join(ws, msg.username, msg.maxPlayers);
         return;
       }
@@ -38,16 +38,26 @@ export class ShichinarabeRoom {
       if (!this.game) return;
 
       if (msg.type === "play_card") {
-        console.log("カード選択");
+        this.sendChat(`Server> ${msg.username} が ${msg.card} を提出しました。`);
         this.game.playCard(msg.username, msg.card);
         this.afterAction();
       }
 
       if (msg.type === "pass_turn") {
-        console.log("パスターン");
+        this.sendChat(`Server> ${msg.username} はパスしました。`);
         this.game.pass(msg.username);
         this.afterAction();
       }
+      //降参ボタン
+      if (msg.type === "resign") {
+        //if (this.game.currentPlayer() !== msg.username) return;
+        //this.game.resign(msg.username);
+        this.game.die(msg.username);
+        this.afterAction();
+        this.sendChat(`Server> ${msg.username} は降参しました。`);
+        return;
+      }
+
     } catch (e) {
       console.error("onMessage例外", e);
     }
@@ -117,8 +127,10 @@ export class ShichinarabeRoom {
       const playable = this.game.getPlayable(name);
       if (playable.length > 0) {
         this.game.playCard(name, playable[Math.floor(Math.random() * playable.length)]);
+        //this.sendChat(`${name} が ${card} を提出しました。`);
       } else {
         this.game.pass(name);
+        //this.sendChat(`${name} はパスしました。`);
       }
       this.afterAction();
     } catch(e) {
@@ -205,7 +217,14 @@ export class ShichinarabeRoom {
       ),
     }));
   }
-  
+
+  sendChat(text) {
+    this.broadcast({
+      type: "chat",
+      text
+    });
+  }
+
   onClose(ws) {
     for (const [name, sock] of this.clients.entries()) {
       if (sock === ws) {

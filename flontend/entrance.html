@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>七並べ ONLINE</title>
+
+<style>
+body {
+  font-family: sans-serif;
+  background: #0a7a3b;
+  color: #fff;
+  margin: 0;
+  padding: 20px;
+}
+
+h1 { text-align: center; }
+
+.panel {
+  max-width: 900px;
+  margin: auto;
+  background: rgba(0,0,0,0.25);
+  padding: 20px;
+  border-radius: 8px;
+}
+
+label { display:block; margin-top:10px; }
+input, select, button {
+  width:100%; margin-top:5px; padding:8px; font-size:16px;
+}
+button { margin-top:15px; cursor:pointer; }
+
+#waiting, #game { display:none; }
+
+#table {
+  display: grid;
+  grid-template-columns: repeat(13, 60px);
+  grid-template-rows: repeat(4, 90px);
+  gap: 6px;
+  justify-content: center;
+  margin: 30px auto;
+  background:#0b6623;
+  padding:10px;
+  border-radius:10px;
+}
+
+.slot {
+  width:60px; height:90px;
+  background:#0a3;
+  border-radius:6px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.hand-card {
+  width:60px;
+  height:90px;
+  cursor:pointer;
+  transition:transform .15s;
+}
+.hand-card:hover { transform:translateY(-6px); }
+</style>
+</head>
+
+<body>
+
+<h1>七並べ ONLINE</h1>
+
+<!-- ===== lobby ===== -->
+<div id="login" class="panel">
+  <label>ユーザー名 <input id="username"></label>
+  <label>ルームID <input id="roomId"></label>
+  <label>人数
+    <select id="playerCount">
+      <option value="2">2人</option>
+      <option value="3">3人</option>
+      <option value="4">4人</option>
+    </select>
+  </label>
+  <button onclick="connect()">参加</button>
+</div>
+
+<div id="waiting" class="panel">
+  <h2>待機中</h2>
+  <div id="status"></div>
+</div>
+
+<!-- ===== game ===== -->
+<div id="game" class="panel">
+  <div id="players-ui" style="display:flex;gap:20px;justify-content:center;"></div>
+  <div id="table"></div>
+  <h3>あなたの手札</h3>
+  <div id="hand" style="display:flex;gap:6px;justify-content:center;"></div>
+  <button id="pass-btn" style="display:none;">パス</button>
+</div>
+
+<script>
+let ws;
+let myName;
+let CTurn = null;
+
+/* ===== 接続 ===== */
+function connect() {
+  myName = username.value.trim();
+  const roomId = roomIdInput.value.trim();
+  const maxPlayers = Number(playerCount.value);
+
+  if (!myName || !roomId) return alert("未入力");
+
+  ws = new WebSocket(`wss://my-worker.6322052.workers.dev/room/${roomId}`);
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({
+      type:"join_game",
+      username:myName,
+      maxPlayers
+    }));
+    login.style.display="none";
+    waiting.style.display="block";
+    status.textContent="参加者待ち…";
+  };
+
+  ws.onmessage = e => handleMessage(JSON.parse(e.data));
+}
+
+const login = document.getElementById("login");
+const waiting = document.getElementById("waiting");
+const game = document.getElementById("game");
+const status = document.getElementById("status");
+const username = document.getElementById("username");
+const roomIdInput = document.getElementById("roomId");
+const playerCount = document.getElementById("playerCount");
+
+/* ===== 受信 ===== */
+function handleMessage(msg) {
+  if (msg.type === "waiting") {
+    status.textContent = `待機中 ${msg.current}/${msg.max}`;
+  }
+
+  if (msg.type === "game_start") {
+    waiting.style.display="none";
+    game.style.display="block";
+    initTable();
+  }
+
+  if (msg.type === "update_table") updateTable(msg);
+  if (msg.type === "update_hand") updateHand(msg);
+  if (msg.type === "announce_turn") updateTurn(msg);
+}
+
+/* ===== table ===== */
+function initTable() {
+  table.innerHTML="";
+  for(let i=0;i<52;i++){
+    const d=document.createElement("div");
+    d.className="slot";
+    table.appendChild(d);
+  }
+}
+const table=document.getElementById("table");
+
+
+function safeSend(data) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    console.warn("WSは閉じています:", data);
+    return;
+  }
+  ws.send(JSON.stringify(data));
+}
+
+/* ===== hand ===== */
+function updateHand(d){
+  if(d.username!==myName)return;
+
+  hand.innerHTML="";
+  CTurn=d.current_turn;
+  const playable=new Set(d.playable);
+
+  d.hand.forEach(c=>{
+    const img=document.createElement("img");
+    img.src=`images/${c}.png`;
+    img.className="hand-card";
+
+    if(!playable.has(c)||CTurn!==myName){
+      img.style.opacity=.3;
+    }else{
+      /*
+      img.onclick=()=>safeSend(JSON.stringify({
+        type:"play_card",
+        username: myName,
+        card:c
+      }));
+      */
+      img.onclick = () => safeSend({
+        type: "play_card",
+        username: myName,
+        card: c
+      });
+
+    }
+    hand.appendChild(img);
+  });
+}
+const hand=document.getElementById("hand");
+
+/* ===== table draw ===== */
+function updateTable(d){
+  const suits=["hearts","spades","diamonds","clubs"];
+  table.innerHTML="";
+  for(let i=0;i<52;i++){
+    const s=document.createElement("div");
+    s.className="slot";
+    table.appendChild(s);
+  }
+  suits.forEach((s,r)=>{
+    d.table[s].forEach((c,i)=>{
+      if(!c)return;
+      const img=document.createElement("img");
+      img.src=`images/${c}.png`;
+      img.style.width="100%";
+      table.children[r*13+i].appendChild(img);
+    });
+  });
+}
+
+/* ===== turn ===== */
+function updateTurn(d){
+  playersUi.innerHTML="";
+  d.players.forEach(p=>{
+    const div=document.createElement("div");
+    div.innerHTML=`<b style="color:${p===d.player?'red':'white'}">${p}</b><br>残り:${d.hand_counts[p]}`;
+    playersUi.appendChild(div);
+  });
+  passBtn.style.display=(d.player===myName)?"block":"none";
+}
+const playersUi=document.getElementById("players-ui");
+const passBtn=document.getElementById("pass-btn");
+passBtn.onclick = () => {
+  /*
+  safeSend(JSON.stringify({
+    type: "pass_turn",
+    username: myName
+  }));
+  */
+  safeSend({
+    type: "pass_turn",
+    username: myName
+  });
+
+};
+</script>
+
+</body>
+</html>

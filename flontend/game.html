@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>七並べ</title>
+
+<style>
+#hand { margin: 20px; }
+.card { width: 100%; height: 100%; object-fit: contain; }
+.hand-card {
+  width: 60px;
+  height: 90px;
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.hand-card:hover { transform: translateY(-6px); }
+
+#table {
+  display: grid;
+  grid-template-columns: repeat(13, 60px);
+  grid-template-rows: repeat(4, 90px);
+  gap: 6px;
+  justify-content: center;
+  margin: 40px auto;
+  background-color: #0b6623;
+  padding: 12px;
+  border-radius: 10px;
+  width: fit-content;
+}
+.slot {
+  width: 60px;
+  height: 90px;
+  background-color: #0a3;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>
+</head>
+
+<body>
+<h1>段位戦</h1>
+
+<div id="table"></div>
+
+<div id="players-ui"
+  style="margin-top:12px;font-size:20px;display:flex;gap:25px;justify-content:center;">
+</div>
+
+<button id="pass-btn" style="padding:8px;display:none;">パス</button>
+
+<h3>あなたの手札</h3>
+<div id="hand"
+  style="
+    position: fixed;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 5px;
+    background-color: rgba(255,255,255,0.2);
+    padding: 10px;
+    border-radius: 10px;
+  ">
+</div>
+
+<div id="ranking-ui"
+  style="
+    position:absolute;
+    right:20px;
+    top:100px;
+    width:180px;
+    padding:10px;
+    border:1px solid #333;
+    background:#fafafa;
+  ">
+</div>
+
+<script>
+/* ===============================
+   基本情報（URLから取得）
+================================ */
+const params = new URLSearchParams(location.search);
+const username = params.get("name");
+const room = params.get("room");
+
+if (!username || !room) {
+  alert("URLに name と room が必要です");
+  throw new Error("missing params");
+}
+
+/* ===============================
+   WebSocket 接続
+================================ */
+const ws = new WebSocket(
+  `wss://my-worker.6322052.workers.dev/room/${room}`
+);
+
+let CTurn = null;
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({
+    type: "join_game",
+    username
+  }));
+};
+
+
+ws.onmessage = (e) => {
+  const msg = JSON.parse(e.data);
+  handleMessage(msg);
+};
+
+ws.onerror = () => alert("WebSocket エラー");
+
+/* ===============================
+   テーブル初期化
+================================ */
+function initTable() {
+  const table = document.getElementById("table");
+  table.innerHTML = "";
+  for (let i = 0; i < 52; i++) {
+    const d = document.createElement("div");
+    d.className = "slot";
+    table.appendChild(d);
+  }
+}
+initTable();
+
+/* ===============================
+   メッセージ処理
+================================ */
+function handleMessage(data) {
+  switch (data.type) {
+    case "update_hand": updateHand(data); break;
+    case "update_table": updateTable(data); break;
+    case "announce_turn": updateTurn(data); break;
+    case "update_ranking": updateRanking(data); break;
+  }
+}
+
+/* ===============================
+   手札更新
+================================ */
+function updateHand(data) {
+  if (data.username !== username) return;
+
+  const handDiv = document.getElementById("hand");
+  handDiv.innerHTML = "";
+
+  const playable = new Set(data.playable);
+  CTurn = data.current_turn;
+
+  data.hand.forEach(card => {
+    const img = document.createElement("img");
+    img.src = `images/${card}.png`;
+    img.className = "hand-card";
+
+    if (!playable.has(card) || CTurn !== username) {
+      img.style.opacity = 0.3;
+    } else {
+      img.onclick = () => {
+        ws.send(JSON.stringify({
+          type: "play_card",
+          username,
+          card
+        }));
+      };
+    }
+    handDiv.appendChild(img);
+  });
+}
+
+/* ===============================
+   盤面更新
+================================ */
+function updateTable(data) {
+  const suits = ["hearts","spades","diamonds","clubs"];
+  const table = document.getElementById("table");
+  table.innerHTML = "";
+
+  for (let i = 0; i < 52; i++) {
+    const d = document.createElement("div");
+    d.className = "slot";
+    table.appendChild(d);
+  }
+
+  suits.forEach((suit, r) => {
+    data.table[suit].forEach((card, c) => {
+      if (!card) return;
+      const idx = r * 13 + c;
+      const slot = table.children[idx];
+      const img = document.createElement("img");
+      img.src = `image/${card}.png`;
+      img.className = "card";
+      slot.appendChild(img);
+    });
+  });
+}
+
+/* ===============================
+   ターン表示
+================================
+function updateTurn(data) {
+  CTurn = data.player;
+  const ui = document.getElementById("players-ui");
+  ui.innerHTML = "";
+
+  data.players.forEach(p => {
+    const d = document.createElement("div");
+    d.innerHTML = `
+      <b style="color:${p===CTurn?'red':'black'}">${p}</b><br>
+      残り:${data.hand_counts[p]}<br>
+      パス:${data.passes[p] ?? 0}/3
+    `;
+    ui.appendChild(d);
+  });
+
+  const passBtn = document.getElementById("pass-btn");
+  if (CTurn === username) {
+    passBtn.style.display = "inline-block";
+    passBtn.onclick = () => {
+      ws.send(JSON.stringify({ type:"pass_turn" }));
+    };
+  } else {
+    passBtn.style.display = "none";
+  }
+}
+  */
+
+function updateTurn(data) {
+  if (!data.players || !Array.isArray(data.players)) return;
+
+  CTurn = data.player;
+  const ui = document.getElementById("players-ui");
+  ui.innerHTML = "";
+
+  data.players.forEach(p => {
+    const d = document.createElement("div");
+    d.innerHTML = `
+      <b style="color:${p===CTurn?'red':'black'}">${p}</b><br>
+      残り:${data.hand_counts[p]}<br>
+      パス:${data.passes[p] ?? 0}/3
+    `;
+    ui.appendChild(d);
+  });
+}
+
+
+/* ===============================
+   ランキング
+================================ */
+function updateRanking(data) {
+  const ui = document.getElementById("ranking-ui");
+  ui.innerHTML = "<b>確定順位</b><br><br>";
+  data.ranks.forEach((p,i)=>{
+    ui.innerHTML += `${i+1}位：${p}<br>`;
+  });
+}
+</script>
+</body>
+</html>

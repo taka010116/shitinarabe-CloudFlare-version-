@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<body>
+<button onclick="connect()">Connect</button>
+
+<script>
+function connect() {
+  const ws = new WebSocket(
+    "wss://my-worker.6322052.workers.dev/room/testroom"
+  );
+
+  ws.onopen = () => {
+    console.log("CONNECTED");
+    ws.send("hello");
+  };
+
+  ws.onmessage = e => {
+    console.log("RECV:", e.data);
+  };
+
+  ws.onerror = e => {
+    console.error("WS ERROR", e);
+  };
+
+  ws.onclose = () => {
+    console.log("CLOSED");
+  };
+}
+</script>
+</body>
+</html>

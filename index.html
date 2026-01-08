@@ -32,7 +32,7 @@ button { margin-top:15px; cursor:pointer; }
 #waiting, #game { display:none; }
 
 #game {
-  display: flex;
+  display: none;
   flex-direction: row;
   align-items: flex-start;
 
@@ -68,12 +68,12 @@ button { margin-top:15px; cursor:pointer; }
 }
 
 .hand-card {
-  width:52px;
-  height:78px;
+  width:68px;
+  height:102px;
   cursor:pointer;
   transition:transform .15s;
 }
-.hand-card:hover { transform:translateY(-6px); }
+.hand-card:hover { transform:translateY(-8px); }
 
 .game-layout {
   display: flex;
@@ -101,7 +101,7 @@ button { margin-top:15px; cursor:pointer; }
   border-radius: 8px;
   padding: 10px;
 
-  display: flex;
+  display: none;
   flex-direction: column;
 
   z-index: 1000;        /* ← ゲームより必ず前 */
@@ -136,6 +136,25 @@ button { margin-top:15px; cursor:pointer; }
   overflow-y: auto;
   flex-shrink: 0;        /* ← 絶対に縮まない */
 }
+
+.chat-input {
+  flex: 1;                 /* 横に最大限伸ばす */
+  height: 36px;            /* 少し高さを出す */
+  padding: 0 10px;
+  font-size: 14px;
+  border-radius: 6px;
+  border: none;
+}
+
+.chat-send {
+  width: 56px;             /* 小さめ */
+  height: 32px;
+  padding: 0;
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
 
 </style>
 </head>
@@ -178,10 +197,54 @@ button { margin-top:15px; cursor:pointer; }
   <!-- ===== 右：チャット ===== -->
   <div class="chat-panel">
     <h3>Chat Log</h3>
+
     <div id="chat-log"></div>
+
+    <div style="margin-top:8px;display:flex;gap:6px;align-items:center;">
+      <input
+        id="chat-input"
+        type="text"
+        placeholder="メッセージを入力"
+        maxlength="100"
+        class="chat-input"
+      >
+      <button id="chat-send" class="chat-send">送信</button>
+    </div>
   </div>
 
+<div id="result-overlay" style="
+  display:none;
+  position:fixed;
+  top:0; left:0;
+  width:100vw;
+  height:100vh;
+  z-index:2000;
+
+  align-items:center;
+  justify-content:center;
+
+  pointer-events:none;   /* ← 通常は操作不可 */
+">
+  <div id="result-panel" style="
+    background: rgba(255,255,255,0.92);
+    color: black;
+    width: 420px;
+    max-width: 90vw;
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 0 30px rgba(0,0,0,0.4);
+    pointer-events:auto;  /* ← パネルだけ操作可能 */
+  ">
+    <h2 style="text-align:center;margin-top:0;">結果発表</h2>
+    <ol id="result-list" style="font-size:18px;"></ol>
+    <div style="text-align:center;margin-top:20px;">
+      <button onclick="location.reload()">ロビーに戻る</button>
+    </div>
+  </div>
 </div>
+</div>
+<!-- ゲーム画面の前に重ねる白パネル -->
+
 
 
 <script>
@@ -234,13 +297,18 @@ function handleMessage(msg) {
 
   if (msg.type === "game_start") {
     waiting.style.display="none";
-    game.style.display="block";
+    game.style.display="flex";
+    document.querySelector(".chat-panel").style.display = "flex";
     initTable();
   }
 
   if (msg.type === "update_table") updateTable(msg);
   if (msg.type === "update_hand") updateHand(msg);
   if (msg.type === "announce_turn") updateTurn(msg);
+
+  if (msg.type === "game_result") {
+    showResult(msg.ranks);
+  }
 }
 
 /* ===== table ===== */
@@ -265,37 +333,63 @@ function safeSend(data) {
 
 /* ===== hand ===== */
 function updateHand(d){
-  if(d.username!==myName)return;
+  if (d.username !== myName) return;
 
-  hand.innerHTML="";
-  CTurn=d.current_turn;
-  const playable=new Set(d.playable);
+  hand.innerHTML = "";
+  CTurn = d.current_turn;
+  const playable = new Set(d.playable);
 
-  d.hand.forEach(c=>{
-    const img=document.createElement("img");
-    img.src=`images/${c}.png`;
-    img.className="hand-card";
+  /* ===== 絵柄の表示順を完全固定 ===== */
+  const suitOrder = {
+    H: 0, // hearts
+    K: 1, // clubs
+    D: 2, // diamonds
+    S: 3  // spades
+  };
 
-    if(!playable.has(c)||CTurn!==myName){
-      img.style.opacity=.3;
-    }else{
-      /*
-      img.onclick=()=>safeSend(JSON.stringify({
-        type:"play_card",
-        username: myName,
-        card:c
-      }));
-      */
+  function parseCard(card) {
+    return {
+      suit: card[0],                 // H / S / D / K
+      suitIndex: suitOrder[card[0]],
+      number: Number(card.slice(1))  // 1〜13
+    };
+  }
+
+  /* ===== 並び替え ===== */
+  const sortedHand = [...d.hand].sort((a, b) => {
+    const ca = parseCard(a);
+    const cb = parseCard(b);
+
+    // ① 絵柄
+    if (ca.suitIndex !== cb.suitIndex) {
+      return ca.suitIndex - cb.suitIndex;
+    }
+
+    // ② 数字
+    return ca.number - cb.number;
+  });
+
+  /* ===== 表示 ===== */
+  sortedHand.forEach(c => {
+    const img = document.createElement("img");
+    img.src = `images/${c}.png`;
+    img.className = "hand-card big-hand";
+
+    if (!playable.has(c) || CTurn !== myName) {
+      img.style.opacity = 0.3;
+    } else {
       img.onclick = () => safeSend({
         type: "play_card",
         username: myName,
         card: c
       });
-
     }
+
     hand.appendChild(img);
   });
 }
+
+
 const hand=document.getElementById("hand");
 
 /* ===== table draw ===== */
@@ -369,7 +463,12 @@ passBtn.onclick = () => {
 };
 
 
+//チャット
+
 const chatLog = document.getElementById("chat-log");
+const chatInput = document.getElementById("chat-input");
+const chatSend = document.getElementById("chat-send");
+
 
 function addChat(text) {
   const div = document.createElement("div");
@@ -377,6 +476,47 @@ function addChat(text) {
   chatLog.appendChild(div);
   chatLog.scrollTop = chatLog.scrollHeight;
 }
+
+/* 送信ボタン */
+chatSend.onclick = sendChat;
+
+/* Enterキー送信 */
+chatInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") sendChat();
+});
+
+function sendChat() {
+  const text = chatInput.value.trim();
+  if (!text) return;
+
+  safeSend({
+    type: "chat",
+    username: myName,
+    text
+  });
+
+  chatInput.value = "";
+}
+
+
+const resultOverlay = document.getElementById("result-overlay");
+const resultList = document.getElementById("result-list");
+
+function showResult(ranks) {
+  console.log("show result", ranks);
+  if (!Array.isArray(ranks)) return;
+
+  resultList.innerHTML = "";
+
+  ranks.forEach((name, i) => {
+    const li = document.createElement("li");
+    li.textContent = `${i + 1}位：${name}`;
+    resultList.appendChild(li);
+  });
+
+  resultOverlay.style.display = "flex";
+}
+
 
 
 </script>

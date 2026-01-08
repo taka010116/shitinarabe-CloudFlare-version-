@@ -6,6 +6,7 @@ export class ShichinarabeRoom {
     this.players = [];       // username の配列（COM含む）
     this.maxPlayers = null;
     this.game = null;
+    this.comBusy = false;
   }
 
   async fetch(req) {
@@ -30,7 +31,7 @@ export class ShichinarabeRoom {
       const msg = JSON.parse(e.data);
 
       if (msg.type === "join_game") {
-        this.sendChat("Server> ゲーム開始します。");
+        this.sendChat("[Server]> ゲーム開始します。");
         this.join(ws, msg.username, msg.maxPlayers);
         return;
       }
@@ -38,25 +39,45 @@ export class ShichinarabeRoom {
       if (!this.game) return;
 
       if (msg.type === "play_card") {
-        this.sendChat(`Server> ${msg.username} が ${msg.card} を提出しました。`);
+        //this.sendChat(`[Server]> ${msg.username} が ${msg.card} を提出しました。`);
         this.game.playCard(msg.username, msg.card);
         this.afterAction();
       }
 
       if (msg.type === "pass_turn") {
-        this.sendChat(`Server> ${msg.username} はパスしました。`);
+        this.sendChat(`[Server]> ${msg.username} はパスしました。`);
         this.game.pass(msg.username);
         this.afterAction();
       }
       //降参ボタン
       if (msg.type === "resign") {
-        //if (this.game.currentPlayer() !== msg.username) return;
+        if (this.game.currentPlayer() !== msg.username) return;
         //this.game.resign(msg.username);
-        this.game.die(msg.username);
+        
+        
+        this.sendChat(`[Server]> ${msg.username} は降参しました。`);
+        this.game.resign(msg.username);
+        this.sendChat(`[Server]> ${msg.username} は降参しました。2`);
         this.afterAction();
-        this.sendChat(`Server> ${msg.username} は降参しました。`);
         return;
       }
+
+      if (msg.type === "chat") {
+        const name = msg.username;
+        const text = msg.text;
+
+        // 最低限のガード
+        //if (!name || !text) return;
+
+        //this.broadcast({
+        //  type: "chat",
+        //  text: `[${name}] > ${text}`
+        //});
+        this.sendChat(`[${name}]> ${text}`);
+
+        return;
+      }
+
 
     } catch (e) {
       console.error("onMessage例外", e);
@@ -116,33 +137,89 @@ export class ShichinarabeRoom {
 
   //CPUのターン
   checkCOMTurn() {
+    if( this.comBusy ) return;
+
     const p = this.game.currentPlayer();
-    if (p.startsWith("COM")) {
-      setTimeout(() => this.comPlay(p), 800);
-    }
+    if (!p || !p.startsWith("COM")) return;
+
+    this.comBusy = true;
+    setTimeout(() => this.comPlay(p), 800);
   }
   //CPUの行動
   comPlay(name) {
     try { //一応例外処理
       const playable = this.game.getPlayable(name);
       if (playable.length > 0) {
-        this.game.playCard(name, playable[Math.floor(Math.random() * playable.length)]);
+        const card = playable[Math.floor(Math.random() * playable.length)];
+        this.game.playCard(name, card);
         //this.sendChat(`${name} が ${card} を提出しました。`);
       } else {
         this.game.pass(name);
-        //this.sendChat(`${name} はパスしました。`);
+        this.sendChat(`[Server]> ${name} はパスしました。`);
       }
-      this.afterAction();
+      //this.afterAction();
     } catch(e) {
       console.error("COMエラー", name, e);
     }
+    this.comBusy = false;
+    this.afterAction();
   }
 
 
 
   afterAction() {
+    //this.sendChat(`AfterAction`);
     this.broadcastGame();
+    for (const name of this.game.dead) {
+      if (!this._loggedDead) this._loggedDead = new Set();
+      if (!this._loggedDead.has(name)) {
+        this.sendChat(`[Server]> ${name} は脱落しました`);
+        this._loggedDead.add(name);
+      }
+    }
+
+    //ゲーム終了判定
+    if (this.game.players.length === 1) {
+      const last = this.game.players[0];
+      this.sendChat(`[Server]> ${last}が最後まで残りました。`);
+      // ★ 最後の一人を「game.js 側の正式処理」で確定させる
+      this.game.finalizeLastPlayer(last);
+      
+      this.game.players = [];
+      this.broadcast({
+        type: "game_result",
+        ranks: this.game.rankSlots
+      });
+      this.sendChat(`[Server]> ゲームを終了します。`);
+      return;
+    }
+
+    /*
+    if (this.game.players.length === 0) {
+      this.broadcast({
+        type: "game_result",
+        ranks: this.game.rankSlots 
+      });
+      this.sendChat(`[Server]> ゲームを終了します。`);
+      return;
+    }
+    */
+    
+    //this.sendChat("turn : " + this.game.turnIndex + "Player : " +  this.game.currentPlayer() +  "PLAYERS : " + this.game.players);
+    //this.Debug("");
     this.checkCOMTurn();
+  }
+
+  Debug(label = "") {
+    if (!this.game) return;
+
+    const turn = this.game.turnIndex;
+    const player = this.game.currentPlayer() ?? "undefined";
+    const players = JSON.stringify(this.game.players);
+
+    this.sendChat(
+      `[DEBUG${label}] > turn=${turn} player=${player} players=${players} ranks=${JSON.stringify(this.game.ranks)}`
+    );
   }
 
   //送信するところ

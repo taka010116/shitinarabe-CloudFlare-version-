@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ログイン</title>
+</head>
+<body>
+
+<h2>ログイン</h2>
+<input id="u" placeholder="ユーザー名"><br>
+<input id="p" type="password" placeholder="パスワード"><br>
+<button onclick="login()">ログイン</button>
+
+<hr>
+
+<button onclick="location.href='/register.html'">
+  アカウント登録
+</button>
+
+<script>
+async function login() {
+  const username = u.value;
+  const password = p.value;
+
+  const res = await fetch("https://my-worker.6322052.workers.dev/api/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password })
+  });
+
+  const data = await res.json();
+  if (!res.ok) return alert(data.error);
+
+  // ログイン成功 → 保存してプロフィールへ
+  localStorage.setItem("user", JSON.stringify(data.user));
+  location.href = "/profile.html";
+}
+</script>
+
+</body>
+</html>

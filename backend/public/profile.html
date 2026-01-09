@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>プロフィール</title>
+<style>
+  body {
+    font-family: sans-serif;
+    max-width: 600px;
+    margin: 40px auto;
+  }
+  .box {
+    border: 1px solid #ccc;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  textarea {
+    width: 100%;
+    height: 80px;
+  }
+</style>
+</head>
+<body>
+
+<h2>七並べ王  PROFILE</h2>
+
+<div class="box">
+  <p><b>ユーザー名：</b><span id="username"></span></p>
+  <p><b>レーティング：</b><span id="rating"></span></p>
+  <p><b>段位：</b><span id="dan"></span></p>
+
+  <p><b>勝利数</b></p>
+  <ul>
+    <li>1位：<span id="win1"></span></li>
+    <li>2位：<span id="win2"></span></li>
+    <li>3位：<span id="win3"></span></li>
+    <li>4位：<span id="win4"></span></li>
+  </ul>
+</div>
+
+<div class="box">
+  <p><b>コメント（自由に編集できます）</b></p>
+  <textarea id="comment"></textarea><br><br>
+  <button onclick="saveComment()">コメント保存</button>
+</div>
+
+<button onclick="logout()">ログアウト</button>
+<button onclick="location.href='/match.html'">
+  対局開始
+</button>
+
+<script>
+const API_BASE = "https://my-worker.6322052.workers.dev";
+
+/* ===== ログインチェック ===== */
+const userStr = localStorage.getItem("user");
+if (!userStr) {
+  location.href = "/login.html";
+}
+
+const user = JSON.parse(userStr);
+
+/* ===== 表示 ===== */
+document.getElementById("username").textContent = user.username;
+document.getElementById("rating").textContent = user.rating;
+document.getElementById("dan").textContent = user.dan;
+
+document.getElementById("win1").textContent = user.win1;
+document.getElementById("win2").textContent = user.win2;
+document.getElementById("win3").textContent = user.win3;
+document.getElementById("win4").textContent = user.win4;
+
+document.getElementById("comment").value = user.comment || "";
+
+/* ===== コメント保存 ===== */
+async function saveComment() {
+  const newComment = document.getElementById("comment").value;
+
+  try {
+    const res = await fetch(API_BASE + "/api/comment", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        username: user.username,
+        comment: newComment
+      })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.error || "保存失敗");
+      return;
+    }
+
+    // localStorage も更新
+    user.comment = newComment;
+    localStorage.setItem("user", JSON.stringify(user));
+
+    alert("コメントを保存しました");
+
+  } catch (e) {
+    console.error(e);
+    alert("通信エラー");
+  }
+}
+
+/* ===== ログアウト ===== */
+function logout() {
+  localStorage.removeItem("user");
+  location.href = "/login.html";
+}
+</script>
+
+</body>
+</html>

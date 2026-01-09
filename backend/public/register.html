@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>アカウント登録</title>
+</head>
+<body>
+
+<h2>アカウント登録</h2>
+
+<input id="u" placeholder="ユーザー名"><br>
+<input id="p" type="password" placeholder="パスワード"><br>
+
+<button onclick="register()">登録</button>
+<button onclick="location.href='/login.html'">戻る</button>
+
+<script>
+async function register() {
+  const username = u.value;
+  const password = p.value;
+
+  const res = await fetch("https://my-worker.6322052.workers.dev/api/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password })
+  });
+
+  const data = await res.json();
+  if (!res.ok) return alert(data.error);
+
+  alert("登録完了。ログインしてください");
+  location.href = "/login.html";
+}
+</script>
+
+</body>
+</html>

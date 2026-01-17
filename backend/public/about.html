@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>このサイトについて｜七並べ名人戦</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    body {
+      margin: 0;
+      background-color: #ffffff;
+      font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      color: #222;
+      line-height: 1.8;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px 80px;
+    }
+
+    h1 {
+      font-size: 28px;
+      border-bottom: 3px solid #000;
+      padding-bottom: 10px;
+      margin-bottom: 30px;
+    }
+
+    h2 {
+      font-size: 22px;
+      margin-top: 50px;
+      border-left: 6px solid #000;
+      padding-left: 10px;
+    }
+
+    p {
+      margin: 15px 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+
+    th, td {
+      border: 1px solid #ccc;
+      padding: 10px;
+      text-align: center;
+    }
+
+    th {
+      background-color: #f5f5f5;
+    }
+
+    .note {
+      background-color: #f9f9f9;
+      border-left: 4px solid #000;
+      padding: 15px;
+      margin: 20px 0;
+    }
+
+    pre {
+      background-color: #111;
+      color: #eee;
+      padding: 15px;
+      overflow-x: auto;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+
+    <h1>このサイトについて</h1>
+
+    <p>
+      「七並べ名人戦」は、七並べの実力を競えるオンライン対戦サイトです。
+      勝敗だけでなく、継続的な実力を評価するためにレーティング制度を採用しています。
+    </p>
+
+    <!-- レーティング -->
+    <h2>レーティングシステム</h2>
+
+    <p>実力を測る指標として、以下のレーティングと段級位を設定しています。(あくまでこのサイト内での段位です。)</p>
+
+    <table>
+      <tr><th>段級位</th><th>レーティング</th></tr>
+      <tr><td>5級</td><td>100</td></tr>
+      <tr><td>4級</td><td>150</td></tr>
+      <tr><td>3級</td><td>250</td></tr>
+      <tr><td>2級</td><td>500</td></tr>
+      <tr><td>1級</td><td>650</td></tr>
+      <tr><td>初段</td><td>1000</td></tr>
+      <tr><td>二段</td><td>1500</td></tr>
+      <tr><td>三段</td><td>2000</td></tr>
+      <tr><td>四段</td><td>2500</td></tr>
+      <tr><td>五段</td><td>3000</td></tr>
+      <tr><td>六段</td><td>3500</td></tr>
+      <tr><td>七段</td><td>4000</td></tr>
+      <tr><td>八段</td><td>4500</td></tr>
+      <tr><td>九段</td><td>5000</td></tr>
+    </table>
+
+    <div class="note">
+      レーティング初期値は <strong>100</strong> です。
+    </div>
+
+    <!-- 計算方式 -->
+    <h2>レーティング計算方式</h2>
+
+    <table>
+      <tr>
+        <th>段級位</th>
+        <th>1位</th>
+        <th>2位</th>
+        <th>3位</th>
+        <th>4位</th>
+      </tr>
+      <tr>
+        <td>5～2級</td>
+        <td>+40</td>
+        <td>+10</td>
+        <td>-10</td>
+        <td>-20</td>
+      </tr>
+      <tr>
+        <td>2～1級</td>
+        <td>+40</td>
+        <td>+10</td>
+        <td>-10</td>
+        <td>-30</td>
+      </tr>
+      <tr>
+        <td>1級～二段</td>
+        <td>+40</td>
+        <td>+10</td>
+        <td>-10</td>
+        <td>-40</td>
+      </tr>
+      <tr>
+        <td>二段～五段</td>
+        <td>+40</td>
+        <td>+10</td>
+        <td>-10</td>
+        <td>-50</td>
+      </tr>
+      <tr>
+        <td>五段以上</td>
+        <td>+40</td>
+        <td>+10</td>
+        <td>-10</td>
+        <td>-60</td>
+      </tr>
+    </table>
+
+    <div class="note">
+      トップ取りゲームです。<strong>1位を狙って戦いましょう。</strong>
+    </div>
+
+    <h2>タイトル</h2>
+    <p>
+        保存されているアカウントのうち、レーティングが最も高いユーザーを名人位とします。
+        
+    </p>
+
+    <!-- 安全性 -->
+    <h2>安全性</h2>
+
+    <p>
+      パスワードは <strong>bcrypt</strong> によりハッシュ化して保存しています。  
+      元のパスワードを復元することは不可能です。
+    </p>
+
+    <p>
+      アカウント情報や戦績データは、  
+      <strong>Cloudflare Workers 内のデータベース</strong> に安全に保管されています。
+    </p>
+
+    <!-- 公平性 -->
+     <h2>マッチングシステム</h2>
+
+    <p>
+      接続人数が足りない場合は、CPUが対戦相手になることがあります。
+      なるべく、人間のプレイヤーとマッチングするように努力はしますが...
+    </p>
+
+    <h2>公平性</h2>
+
+    <p>
+      カード配布は完全ランダムで行われ、  
+      すべてサーバー側で処理されるため、不正や改ざんはできません。
+    </p>
+
+    <pre><code>initGame() {
+  const deck = [];
+  const suits = ["H", "S", "D", "K"];
+
+  for (const s of suits) {
+    for (let n = 1; n <= 13; n++) {
+      deck.push(s + n);
+    }
+  }
+
+  deck.sort(() => Math.random() - 0.5);
+
+  this.players.forEach(p => {
+    this.hands[p] = [];
+    this.passes[p] = 0;
+  });
+
+  this.players.forEach((p, i) => {
+    this.hands[p] = deck.slice(i * 13, (i + 1) * 13);
+  });
+
+  // 7を即出し
+  for (const p of this.players) {
+    this.hands[p] = this.hands[p].filter(card => {
+      const suit = this.suitName(card[0]);
+      const num = Number(card.slice(1));
+      if (num === 7) {
+        this.table[suit][6] = card;
+        return false;
+      }
+      return true;
+    });
+  }
+}
+
+</code></pre>
+
+
+  </div>
+
+</body>
+</html>

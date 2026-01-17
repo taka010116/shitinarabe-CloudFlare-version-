@@ -172,6 +172,7 @@ export class ShichinarabeGame {
     if(type === "winner"){
       //this.ranks.unshift(name);
       this.rankSlots[this.rankTop++] = name;
+      console.log("1位");
     }else{
       this.rankSlots[this.rankBottom--] = name;
       //this.ranks.push(name);

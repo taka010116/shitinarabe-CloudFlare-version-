@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>将棋と麻雀に生きる</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: "Yu Gothic", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      background: radial-gradient(circle at top, #111827, #000);
+      color: #f9fafb;
+    }
+    header {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 20px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.9));
+    }
+    header h1 {
+      font-size: 3.5rem;
+      margin: 0;
+      letter-spacing: 0.15em;
+    }
+    header h1 span {
+      color: #facc15;
+    }
+    header p {
+      margin-top: 20px;
+      font-size: 1.3rem;
+      max-width: 700px;
+      line-height: 1.8;
+      opacity: 0.9;
+    }
+    .emphasis {
+      margin-top: 40px;
+      font-size: 1.1rem;
+      background: rgba(250, 204, 21, 0.15);
+      padding: 20px 30px;
+      border-left: 5px solid #facc15;
+    }
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 80px 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 40px;
+    }
+    .card {
+      background: #020617;
+      border-radius: 20px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+    .card img {
+      width: 100%;
+      height: 220px;
+      object-fit: cover;
+      filter: grayscale(20%) contrast(110%);
+    }
+    .card-content {
+      padding: 25px;
+    }
+    .card h2 {
+      margin: 0 0 15px 0;
+      font-size: 1.8rem;
+      color: #facc15;
+      letter-spacing: 0.1em;
+    }
+    .card p {
+      margin: 0;
+      line-height: 1.9;
+      font-size: 1rem;
+      opacity: 0.95;
+    }
+    .statement {
+      grid-column: 1 / -1;
+      text-align: center;
+      font-size: 1.2rem;
+      line-height: 2;
+      padding: 40px 20px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 20px;
+    }
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      background: #000;
+      color: #9ca3af;
+      font-size: 0.9rem;
+    }
+    footer strong {
+      color: #facc15;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span>将棋</span>と<span>麻雀</span>に、人生を賭ける</h1>
+    <p>
+      私の趣味は将棋と麻雀です。<br />
+      単なる娯楽ではなく、<strong>思考力・構造理解・心理戦</strong>を極限まで楽しむための
+      ライフワークとして向き合っています。
+    </p>
+    <div class="emphasis">
+      勝ち筋を読む。<br />
+      相手の一手を疑う。<br />
+      そして、最善手を選び続ける。<br />
+      —— それが、将棋と麻雀の魅力です。
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <img src="shogi.jpg" alt="将棋の画像" />
+      <div class="card-content">
+        <h2>SHOGI</h2>
+        <p>
+          将棋は、完全情報ゲームだからこそ思考の深さが問われます。
+          序盤構想・中盤の読み合い・終盤の詰み筋まで、
+          一手一手に論理と美学が存在します。
+          私は特に「形勢判断」と「終盤力」に魅力を感じています。
+        </p>
+      </div>
+    </section>
+
+    <section class="card">
+      <img src="mahjong.jpg" alt="麻雀の画像" />
+      <div class="card-content">
+        <h2>MAHJONG</h2>
+        <p>
+          麻雀は、不完全情報ゲームの極致です。
+          確率計算、点数状況、相手の心理を総合的に判断し、
+          攻めるか、降りるかを瞬時に決断します。
+          運と実力が交錯する点に、他にはない奥深さがあります。
+        </p>
+      </div>
+    </section>
+
+    <div class="statement">
+      将棋と麻雀は、私にとって
+      <strong>考え続ける力を鍛えるための最高の教材</strong>です。<br />
+      この2つのゲームが好きだということは、
+      「考えることそのものが好きだ」という意思表示でもあります。
+    </div>
+  </main>
+
+  <footer>
+    <p>© <strong>SHOGI & MAHJONG</strong> — Thinking Game Portfolio</p>
+  </footer>
+</body>
+</html>

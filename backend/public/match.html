@@ -117,6 +117,20 @@ body {
 <!-- ===== GAME ===== -->
 <div id="game" class="panel">
   <div id="players-ui"></div>
+  <!-- ===== TURN TIMER ===== -->
+<div id="turn-timer" style="
+  margin: 8px auto;
+  width: fit-content;
+  padding: 6px 14px;
+  font-size: 18px;
+  font-weight: bold;
+  background: #222;
+  color: #fff;
+  border-radius: 10px;
+  display: none;
+">
+</div>
+
   <div id="table"></div>
   <h3>あなたの手札</h3>
   <div id="hand" style="display:flex;gap:6px;justify-content:center;"></div>
@@ -132,6 +146,8 @@ body {
     <button id="chat-send" class="chat-send">送信</button>
   </div>
 </div>
+
+
 
 <!-- ===== RESULT ===== -->
 <div id="result-overlay">
@@ -167,13 +183,25 @@ let ws;
 let myName = user.username;
 let CTurn = null;
 
-ws = new WebSocket("ws://localhost:8080");
+const socketProtocol = location.protocol === "https:" ? "wss" : "ws";
+
+// URLを動的に生成（ドメインを直書きせず location.host を使うのがベスト）
+//const socketUrl = `${socketProtocol}://${location.host}/match`;
+//const socketUrl = 'wss://160.251.141.39:8080';
+//const socketUrl = 'ws://localhost:8080';
+const socketUrl = "wss://shitinarabeserver.com/game"
+
+//const ws = new WebSocket("wss://shitinarabeserver.com");
+const turnTimerDiv = document.getElementById("turn-timer");
+
+console.log("Connecting to:", socketUrl);
+ws = new WebSocket(socketUrl);
 
 ws.onopen = () => {
+  console.log("Connected!");
   ws.send(JSON.stringify({
-    type:"join_game",
-    username:myName,
-    maxPlayers:4,
+    type: "join_game",
+    username: myName,
     dan: user.dan,
     rating: user.rating 
   }));
@@ -238,9 +266,37 @@ function handleMessage(msg){
   if(msg.type==="update_hand") updateHand(msg);
   if(msg.type==="announce_turn") updateTurn(msg);
   if(msg.type==="chat") addChat(msg.text);
-  if(msg.type==="game_result") showResult(msg.ranks);
-}
+  if(msg.type==="game_result") {
+    turnTimerDiv.style.display = "none";
+    showResult(msg.ranks);
+  }
+  if (msg.type === "turn_timer") {
+    turnTimerDiv.style.display = "block";
 
+    const isMyTurn = msg.player === myName;
+
+    turnTimerDiv.textContent =
+      `${msg.player} の残り時間：${msg.remain} 秒` +
+      (isMyTurn ? "（あなた）" : "");
+
+    console.log("残り時間 " + msg.remain + "秒");
+
+  
+
+  // 色制御
+    if (msg.remain <= 5) {
+      turnTimerDiv.style.background = "#b00000"; // 赤
+    } else if (isMyTurn) {
+      turnTimerDiv.style.background = "#0044aa"; // 自分の手番
+    } else {
+      turnTimerDiv.style.background = "#222";    // 通常
+    }
+  }
+  //昇段したか？
+  if (msg.type === "rating_update" && msg.promoted) {
+    addResultMessage(msg.message);
+  }
+}
 
 /* ===============================
    ゲームUI

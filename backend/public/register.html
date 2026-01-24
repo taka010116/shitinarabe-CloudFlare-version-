@@ -15,21 +15,50 @@
 <button onclick="location.href='/login.html'">戻る</button>
 
 <script>
-async function register() {
-  const username = u.value;
-  const password = p.value;
+let socket;
 
-  const res = await fetch("https://my-worker.6322052.workers.dev/api/register", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password })
-  });
+function connectSocket() {
+  socket = new WebSocket("wss://shitinarabeserver.com"); // サーバーの WSS URL
 
-  const data = await res.json();
-  if (!res.ok) return alert(data.error);
+  socket.onopen = () => {
+    console.log("WebSocket 接続成功");
+  };
 
-  alert("登録完了。ログインしてください");
-  location.href = "/login.html";
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    if (data.status === "ok") {
+      alert(data.message);
+      location.href = "/login.html";
+    } else {
+      alert("登録失敗: " + data.message);
+    }
+  };
+
+  socket.onerror = (err) => {
+    console.error("WebSocketエラー:", err);
+  };
+
+  socket.onclose = () => {
+    console.log("WebSocket切断");
+  };
+}
+
+connectSocket();
+
+function register() {
+  const username = document.getElementById("u").value;
+  const password = document.getElementById("p").value;
+
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    alert("WebSocketが接続されていません");
+    return;
+  }
+
+  socket.send(JSON.stringify({
+    type: "register",
+    username,
+    password
+  }));
 }
 </script>
 

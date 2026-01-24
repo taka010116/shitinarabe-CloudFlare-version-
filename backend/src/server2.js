@@ -4,10 +4,6 @@ import { ShichinarabeGame } from "./game.js";
 const wss = new WebSocketServer({ port: 8080 });
 console.log("Match & Game server running on ws://localhost:8080");
 
-/* ============================
-   グローバル状態
-============================ */
-
 // 待機ロビー（ゲーム未参加者のみ）
 const lobby = new Map();     // ws -> player
 
@@ -19,25 +15,49 @@ let roomSeq = 1;
 let countdownTimer = null;
 let countdownRemain = 0;
 
+const DAN_TABLE = [
+  { dan: "5級", rating: 100 },
+  { dan: "4級", rating: 150 },
+  { dan: "3級", rating: 250 },
+  { dan: "2級", rating: 500 },
+  { dan: "1級", rating: 650 },
+  { dan: "初段", rating: 1000 },
+  { dan: "二段", rating: 1500 },
+  { dan: "三段", rating: 2000 },
+  { dan: "四段", rating: 2500 },
+  { dan: "五段", rating: 3000 },
+  { dan: "六段", rating: 3500 },
+  { dan: "七段", rating: 4000 },
+  { dan: "八段", rating: 4500 },
+  { dan: "九段", rating: 5000 }
+];
 
-/* ============================
-   util
-============================ */
+//レーティング段位取得
+function getDanFromRating(rating) {
+  let result = DAN_TABLE[0].dan;
+  for (const d of DAN_TABLE) {
+    if (rating >= d.rating) {
+      result = d.dan;
+    }
+  }
+  return result;
+}
+
 
 function send(ws, data) {
   ws.send(JSON.stringify(data));
 }
 
-/* ============================
-   Room クラス
-============================ */
-
+//クラスROOM
 class Room {
   constructor(roomId, entries) {
     this.roomId = roomId;
     this.players = new Map(entries); // ws -> player
     this.game = null;
     this.locked = false;
+
+    this.turnTimer = null;
+    this.turnRemain = 0;
 
     for (const ws of this.players.keys()) {
       ws.state = "room";
@@ -114,6 +134,8 @@ class Room {
     const g = this.game;
     if (!g) return;
 
+    this.stopTurnTimer();
+
     this.broadcastGameState();
 
     for (const dead of g.dead) {
@@ -136,6 +158,46 @@ class Room {
 
       console.log(`▶ Room${this.roomId} 終了`);
 
+      //レーティング計算
+      for (let i = 0; i < g.rankSlots.length; i++) {
+        const name = g.rankSlots[i];
+        const rank = i + 1;
+
+        // COM は無視
+        if (name.startsWith("COM")) continue;
+
+        // ws と player 情報を取得
+        const entry = [...this.players.entries()]
+          .find(([, p]) => p.username === name);
+        if (!entry) continue;
+
+        const [ws, player] = entry;
+        const beforeRating = player.rating;
+        const beforeDan = getDanFromRating(beforeRating);
+
+        const afterDan = getDanFromRating(player.rating);
+        const promoted = beforeDan !== afterDan;
+        const delta = getRankDelta(rank, player.dan);
+        player.rating += delta;
+
+        // クライアント通知
+        send(ws, {
+          type: "rating_update",
+          delta,
+          rating: player.rating,
+          beforeDan,
+          afterDan,
+          promoted,
+          message: promoted
+            ? `昇段しました ${beforeDan} → ${afterDan}`
+            : null
+        });
+
+        // DB 更新
+        updateRating(player.username, player.rating);
+      }
+
+
       // プレイヤーをロビーへ戻す
       for (const [ws, p] of this.players.entries()) {
         ws.state = "lobby";
@@ -156,13 +218,127 @@ class Room {
       setTimeout(() => {
         g.processCOM(() => this.afterAction());
       }, 400);
+      return;
+    }
+
+    this.startTurnTimer();
+
+  }
+
+    /* ===== ターンタイマー ===== */
+    startTurnTimer() {
+    this.stopTurnTimer();
+
+    const g = this.game;
+    if (!g) return;
+
+    const player = g.currentPlayer();
+
+    // COM は対象外
+    if (player.startsWith("COM")) return;
+
+    this.turnRemain = 20;
+
+    this.broadcast({
+      type: "turn_timer",
+      player,
+      remain: this.turnRemain
+    });
+
+    this.turnTimer = setInterval(() => {
+      this.turnRemain--;
+
+      this.broadcast({
+        type: "turn_timer",
+        player,
+        remain: this.turnRemain
+      });
+
+      if (this.turnRemain <= 0) {
+        this.stopTurnTimer();
+
+        // まだ同じ人の手番なら自動処理
+        if (g.currentPlayer() === player) {
+          const playable = g.getPlayable(player);
+
+          if (playable.length > 0) {
+            // 出せるものからランダム
+            const card =
+              playable[Math.floor(Math.random() * playable.length)];
+
+            this.broadcast({
+              type: "chat",
+              text: `[Server] ${player} は時間切れのため ${card} を自動提出しました`
+            });
+
+            g.playCard(player, card);
+          } else {
+            // 出せるものなし → パス
+            this.broadcast({
+              type: "chat",
+              text: `[Server] ${player} は時間切れのため自動パスしました`
+            });
+
+            g.pass(player);
+          }
+
+          this.afterAction();
+        }
+      }
+    }, 1000);
+  }
+
+  stopTurnTimer() {
+    if (this.turnTimer) {
+      clearInterval(this.turnTimer);
+      this.turnTimer = null;
     }
   }
+
 }
+
+//でーたべーす
+async function updateRating(username, newRating) {
+  
+  console.log(`💾 DB更新: ${username} → R${newRating}`);
+  try {
+    await fetch("https://my-worker.6322052.workers.dev/api/rating", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        username,
+        rating: newRating
+      })
+    });
+
+    console.log(`💾 レーティング送信: ${username} → ${newRating}`);
+  } catch (e) {
+    console.error("❌ レーティング更新失敗", e);
+  }
+}
+
+//レーティング計算
+function getRankDelta(rank, dan) {
+  // rank: 1,2,3,4
+  if (rank === 1) return 40;
+  if (rank === 2) return 10;
+  if (rank === 3) return -10;
+
+  // 4位（段級位別）
+  if (dan <= -2) return -20;       // 5～2級
+  if (dan === -1) return -30;      // 1級
+  if (dan >= 1 && dan <= 2) return -40; // 初段～二段
+  if (dan >= 3 && dan <= 5) return -50; // 三～五段
+  return -60;                      // 六段以上
+}
+
 
 /* ============================
    ロビー配信（待機者のみ）
 ============================ */
+
 
 function broadcastLobby() {
   const list = [...lobby.values()];
@@ -318,17 +494,20 @@ wss.on("connection", (ws) => {
 
     if (msg.type === "play_card") {
       if (g.currentPlayer() !== msg.username) return;
+      room.stopTurnTimer();
       g.playCard(msg.username, msg.card);
       room.afterAction();
     }
 
     if (msg.type === "pass_turn") {
       if (g.currentPlayer() !== msg.username) return;
+      room.stopTurnTimer();
       g.pass(msg.username);
       room.afterAction();
     }
 
     if (msg.type === "resign") {
+      if (!room.game.players.includes(username)) return;
       if (g.currentPlayer() !== msg.username) return;
       room.broadcast({
         type: "chat",
@@ -349,11 +528,27 @@ wss.on("connection", (ws) => {
   ws.on("close", () => {
     if (ws.state === "lobby") {
       lobby.delete(ws);
+      broadcastLobby();
+      return;
     }
 
+    
     if (ws.state === "room") {
       const room = rooms.get(ws.roomId);
-      if (room) room.players.delete(ws);
+      if (!room || !room.game) return;
+
+      const player = room.players.get(ws);
+      if (!player) return;
+
+      const username = player.username;
+      room.broadcast({
+        type: "chat",
+        text: `[Server] ${username} が切断しました（自動降参）`
+      });
+
+      room.game.resign(username);
+      room.players.delete(ws);
+      room.afterAction();
     }
 
     broadcastLobby();

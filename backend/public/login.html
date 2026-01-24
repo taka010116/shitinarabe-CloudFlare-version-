@@ -18,23 +18,36 @@
 </button>
 
 <script>
-async function login() {
-  const username = u.value;
-  const password = p.value;
 
-  const res = await fetch("https://my-worker.6322052.workers.dev/api/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password })
-  });
+let socket = new WebSocket("wss://shitinarabeserver.com");
 
-  const data = await res.json();
-  if (!res.ok) return alert(data.error);
+socket.onopen = () => console.log("WebSocket接続成功");
+socket.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  if (data.status === "ok" && data.user) {
+    localStorage.setItem("user", JSON.stringify(data.user));
+    alert(data.message);
+    location.href = "/profile.html";
+  } else {
+    alert(data.message);
+  }
+};
 
-  // ログイン成功 → 保存してプロフィールへ
-  localStorage.setItem("user", JSON.stringify(data.user));
-  location.href = "/profile.html";
+function login() {
+  const username = document.getElementById("u").value;
+  const password = document.getElementById("p").value;
+
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    return alert("WebSocketが接続されていません");
+  }
+
+  socket.send(JSON.stringify({
+    type: "login",
+    username,
+    password
+  }));
 }
+
 </script>
 
 </body>

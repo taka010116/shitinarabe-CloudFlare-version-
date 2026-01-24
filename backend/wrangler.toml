@@ -7,13 +7,28 @@ name = "ROOM"
 class_name = "ShichinarabeRoom"
 
 #[[durable_objects.bindings]]
+#name = "GAME"
+#class_name = "GameServer"
+
+#[[durable_objects.bindings]]
 ##name = "MATCH"
 #class_name = "Matchmaker"
+
 
 [[d1_databases]]
 binding = "DB"
 database_name = "shitinarabe_db"
 database_id = "3a448916-cd75-4fa4-87c6-733f2e6d49e6"
+
+#[[migrations]]
+#tag = "v1"
+#new_sqlite_classes = ["GameServer"]
+
+# ★ 追加：ShichinarabeRoom を Durable Object として登録
+#[[migrations]]
+#tag = "v2"
+#new_sqlite_classes = ["ShichinarabeRoom"]
+
 
 [assets]
 directory = "./public"

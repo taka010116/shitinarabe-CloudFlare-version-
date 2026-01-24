@@ -52,27 +52,58 @@
 <script>
 const API_BASE = "https://my-worker.6322052.workers.dev";
 
-/* ===== ログインチェック ===== */
+/* =========================
+   ログインチェック
+========================= */
 const userStr = localStorage.getItem("user");
 if (!userStr) {
   location.href = "/login.html";
 }
 
-const user = JSON.parse(userStr);
+const cachedUser = JSON.parse(userStr);
 
-/* ===== 表示 ===== */
-document.getElementById("username").textContent = user.username;
-document.getElementById("rating").textContent = user.rating;
-document.getElementById("dan").textContent = user.dan;
+/* =========================
+   最新プロフィール取得
+========================= */
+async function loadProfile() {
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/profile?username=${encodeURIComponent(cachedUser.username)}`
+    );
 
-document.getElementById("win1").textContent = user.win1;
-document.getElementById("win2").textContent = user.win2;
-document.getElementById("win3").textContent = user.win3;
-document.getElementById("win4").textContent = user.win4;
+    if (!res.ok) {
+      throw new Error("profile fetch failed");
+    }
 
-document.getElementById("comment").value = user.comment || "";
+    const user = await res.json();
 
-/* ===== コメント保存 ===== */
+    // 表示更新
+    document.getElementById("username").textContent = user.username;
+    document.getElementById("rating").textContent = user.rating;
+    document.getElementById("dan").textContent = user.dan;
+
+    document.getElementById("win1").textContent = user.win1 ?? 0;
+    document.getElementById("win2").textContent = user.win2 ?? 0;
+    document.getElementById("win3").textContent = user.win3 ?? 0;
+    document.getElementById("win4").textContent = user.win4 ?? 0;
+
+    document.getElementById("comment").value = user.comment || "";
+
+    // localStorage を最新状態に更新
+    localStorage.setItem("user", JSON.stringify(user));
+
+  } catch (e) {
+    console.error(e);
+    alert("プロフィール取得に失敗しました");
+  }
+}
+
+// ページ表示時に必ず最新データを取得
+loadProfile();
+
+/* =========================
+   コメント保存
+========================= */
 async function saveComment() {
   const newComment = document.getElementById("comment").value;
 
@@ -83,7 +114,7 @@ async function saveComment() {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        username: user.username,
+        username: cachedUser.username,
         comment: newComment
       })
     });
@@ -96,6 +127,7 @@ async function saveComment() {
     }
 
     // localStorage も更新
+    const user = JSON.parse(localStorage.getItem("user"));
     user.comment = newComment;
     localStorage.setItem("user", JSON.stringify(user));
 
@@ -107,7 +139,9 @@ async function saveComment() {
   }
 }
 
-/* ===== ログアウト ===== */
+/* =========================
+   ログアウト
+========================= */
 function logout() {
   localStorage.removeItem("user");
   location.href = "/login.html";

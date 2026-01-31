@@ -1,0 +1,253 @@
+<head>
+<meta charset="UTF-8">
+
+<meta name="google-site-verification" content="zgzvsxAG3iXZ5kx5DMXSDFnI0RJY-W-D16qhRF0hT-I" />
+
+
+<title>七並べ名人戦 | オンライン七並べ対戦サイト</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- 検索エンジン説明 -->
+<meta name="description" content="七並べ名人戦は全国のプレイヤーとオンライン対戦できる七並べゲームサイト。ランキング・レーティング機能搭載。">
+<meta name="keywords" content="七並べ,オンラインゲーム,カードゲーム,七並べ対戦,ブラウザゲーム,トランプ,オンライン">
+
+<!-- 正規URL -->
+<link rel="canonical" href="https://my-worker.6322052.workers.dev/title">
+
+<!-- OGP（SNS共有） -->
+<meta property="og:title" content="七並べ名人戦 | オンライン七並べ対戦サイト">
+<meta property="og:description" content="全国のプレイヤーと七並べ対戦！ランキング・レーティング対応。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://my-worker.6322052.workers.dev/title">
+<meta property="og:image" content="https://my-worker.6322052.workers.dev/images/title.png">
+
+<!-- Twitter用 -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="七並べ名人戦">
+<meta name="twitter:description" content="オンラインで七並べ対戦！">
+<meta name="twitter:image" content="https://my-worker.6322052.workers.dev/images/title.png">
+
+</head>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      background-color: #ffffff;
+    }
+
+    .wrapper {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      padding: 40px 20px;
+      flex-wrap: wrap;
+    }
+
+    /* ===== 共通サイドボックス ===== */
+    .side-box {
+      width: 260px;
+      border: 2px solid #000;
+      border-radius: 10px;
+      padding: 20px;
+    }
+
+    .side-box h2 {
+      margin-top: 0;
+      font-size: 20px;
+      border-bottom: 1px solid #000;
+      padding-bottom: 8px;
+    }
+
+    /* ===== 中央 ===== */
+    .center {
+      max-width: 600px;
+      text-align: center;
+    }
+
+    .title-image {
+      max-width: 100%;
+      height: auto;
+      margin-bottom: 40px;
+    }
+
+    .menu {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .menu a {
+      display: block;
+      padding: 18px;
+      font-size: 20px;
+      text-decoration: none;
+      color: #000;
+      border: 2px solid #000;
+      border-radius: 8px;
+      transition: background-color 0.2s, color 0.2s;
+    }
+
+    .menu a:hover {
+      background-color: #000;
+      color: #fff;
+    }
+
+    /* ===== 更新情報 ===== */
+    .news-item {
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    /* ===== ランキング ===== */
+    .rank-item {
+      
+      margin: 14px 0;
+    }
+
+    .rank-name {
+      font-weight: bold;
+    }
+
+    .rank-meta {
+      font-size: 14px;
+      color: #444;
+    }
+    .news-box {
+      margin-top: 20px;
+      max-height: 160px;
+      overflow-y: auto;
+      border-top: 1px solid #000;
+      padding-top: 10px;
+    }
+
+    .news-item {
+      font-size: 14px;
+      margin-bottom: 12px;
+    }
+
+    .menu button {
+      padding: 14px;
+      font-size: 16px;
+      font-family: "MS Gothic", monospace;
+      border: 1px solid #000;
+      background: #f8f8f8;
+      cursor: pointer;
+    } 
+
+    .menu button:hover {
+      background: #000;
+      color: #fff;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div id="login-state" style="margin-top:15px;font-size:14px;"></div>
+
+  <div class="wrapper">
+
+    <!-- 真ん中：タイトル＋メニュー -->
+    <div class="center">
+      <img src="images/title.png" alt="七並べ名人戦" class="title-image">
+
+      <div class="menu">
+        <a id="match-btn" href="#">全国対戦</a>
+        <a href="https://taka010116.github.io/shitinarabe-CloudFlare-version-/">友人戦</a>
+        <a href="about.html">このサイトについて</a>
+        <button id="profile-btn" style="display:none;">プロフィール</button>
+      </div>
+    </div>
+
+    <!-- 右：ランキング -->
+    <div class="side-box">
+      <h2>Ranking</h2>
+      <div id="ranking-list">
+        読み込み中…
+      </div>
+      <h2 style="margin-top: 30px;">更新</h2>
+
+      <div class="news-box">
+        <div class="news-item">・2026/01/24<br>レーティング機能を実装</div>
+        <div class="news-item">・2026/01/23<br>全国対戦を公開</div>
+        <div class="news-item">・2026/01/20<br>WebSocket通信に対応</div>
+        <div class="news-item">・2026/01/18<br>UIデザインを刷新</div>
+        <div class="news-item">・2026/01/15<br>サーバー安定化対応</div>
+      </div>
+    </div>
+    </div>
+
+  </div>
+
+  <!-- ===== WebSocket通信 ===== -->
+  <script>
+    const ws = new WebSocket("wss://shitinarabeserver.com/");
+    const user = localStorage.getItem("user");
+
+    const matchBtn = document.getElementById("match-btn");
+    const profileBtn = document.getElementById("profile-btn");
+    const loginState = document.getElementById("login-state");
+
+    if (user) {
+      profileBtn.style.display = "block";
+
+      matchBtn.onclick = () => {
+        location.href = "/profile.html";
+      };
+
+      profileBtn.onclick = () => {
+        location.href = "/profile.html";
+      };
+    } else {
+      // 未ログイン
+      matchBtn.onclick = () => {
+        location.href = "/register.html";
+      };
+    }
+
+    if (user) {
+      const u = JSON.parse(user);
+      document.getElementById("login-state").textContent =
+        `ようこそ ${u.username} さん`;
+    }
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({
+        type: "get_ranking_top3"
+      }));
+    };
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+
+      if (msg.type === "ranking_top3") {
+        const listEl = document.getElementById("ranking-list");
+        listEl.innerHTML = "";
+
+        if (!msg.list || msg.list.length === 0) {
+          listEl.textContent = "ランキングデータがありません";
+          return;
+        }
+
+        msg.list.forEach((player, index) => {
+          const div = document.createElement("div");
+          div.className = "rank-item";
+          div.innerHTML = `
+            <div class="rank-name">${index + 1}位：${player.username} ${player.dan}</div>
+            <div class="rank-meta">Rating：${player.rating}</div>
+          `;
+          listEl.appendChild(div);
+        });
+      }
+    };
+
+    ws.onerror = () => {
+      document.getElementById("ranking-list").textContent =
+        "ランキング取得に失敗しました";
+    };
+  </script>
+
+</body>
+</html>

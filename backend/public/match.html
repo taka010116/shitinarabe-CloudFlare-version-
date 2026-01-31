@@ -97,6 +97,69 @@ body {
   padding:20px;
   border-radius:10px;
 }
+
+.rating-plus {
+  color: red;
+  font-weight: bold;
+  margin-left: 8px;
+}
+
+.rating-minus {
+  color: blue;
+  font-weight: bold;
+  margin-left: 8px;
+}
+
+
+
+/* 昇段オーバーレイ */
+#promotion-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: none;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+/* 中央ボックス */
+.promotion-box {
+  text-align: center;
+  animation: popIn 2.5s ease forwards;
+}
+
+.promotion-box img {
+  width: 300px;
+}
+
+#promotion-text {
+  margin-top: 16px;
+  font-size: 32px;
+  font-weight: bold;
+  color: gold;
+  text-shadow: 0 0 10px #fff;
+}
+
+/* アニメーション */
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  20% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  60% {
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
 </style>
 </head>
 
@@ -154,9 +217,18 @@ body {
   <div id="result-panel">
     <h2>結果</h2>
     <ol id="result-list"></ol>
-    <button onclick="location.reload()">戻る</button>
+    <button onclick="backToLobby()">戻る</button>
   </div>
 </div>
+
+<!-- 昇段演出 -->
+<div id="promotion-overlay">
+  <div class="promotion-box">
+    <img src="./images/shodan.png" alt="昇段" />
+    <div id="promotion-text"></div>
+  </div>
+</div>
+
 
 <script>
 /* ===============================
@@ -165,6 +237,7 @@ body {
 const userStr = localStorage.getItem("user");
 if (!userStr) location.href="/login.html";
 const user = JSON.parse(userStr);
+const ratingDeltas = {};
 
 document.getElementById("waiting").style.display="block";
 document.getElementById("myinfo").textContent =
@@ -207,31 +280,6 @@ ws.onopen = () => {
   }));
 };
 
-/*
-ws.onmessage = (e) => {
-  const msg = JSON.parse(e.data);
-
-  if (msg.type === "waiting") {
-    listDiv.innerHTML = "";
-
-    msg.players.forEach(p => {
-      const d = document.createElement("div");
-      d.textContent =
-        `${p.username} ｜ ${p.dan} ｜ R${p.rating}`;
-      listDiv.appendChild(d);
-    });
-
-    status.textContent =
-        `待機中（${msg.count}人）`;
-  }
-
-  if (msg.type === "game_start") {
-    status.textContent =
-      `${msg.playerCount}人で対局開始！`;
-    // ここでゲーム画面へ遷移 or 初期化
-  }
-};
-*/
 
 ws.onmessage = e => handleMessage(JSON.parse(e.data));
 
@@ -266,9 +314,20 @@ function handleMessage(msg){
   if(msg.type==="update_hand") updateHand(msg);
   if(msg.type==="announce_turn") updateTurn(msg);
   if(msg.type==="chat") addChat(msg.text);
+  if(msg.type==="enter_lobby"){
+    if (msg.promotion) {
+      showMessagePanel(
+        "昇段しました！",
+        [`段位：${msg.promotion.rank}`]
+      );
+    } else {
+      location.reload();
+    }
+    
+  }
   if(msg.type==="game_result") {
     turnTimerDiv.style.display = "none";
-    showResult(msg.ranks);
+    showResult(msg.results);
   }
   if (msg.type === "turn_timer") {
     turnTimerDiv.style.display = "block";
@@ -276,8 +335,8 @@ function handleMessage(msg){
     const isMyTurn = msg.player === myName;
 
     turnTimerDiv.textContent =
-      `${msg.player} の残り時間：${msg.remain} 秒` +
-      (isMyTurn ? "（あなた）" : "");
+      `${msg.remain}` +
+      ("");
 
     console.log("残り時間 " + msg.remain + "秒");
 
@@ -337,8 +396,10 @@ function updateHand(d){
   hand.innerHTML="";
   CTurn=d.current_turn;
   const playable=new Set(d.playable);
+  
+  const sortedHand = [...d.hand].sort(cardSort);
 
-  d.hand.forEach(c=>{
+  sortedHand.forEach(c=>{
     const img=document.createElement("img");
     img.src=`images/${c}.png`;
     img.className="hand-card";
@@ -354,6 +415,29 @@ function updateHand(d){
     hand.appendChild(img);
   });
 }
+
+const suitOrder = {
+  H: 0,
+  D: 1,
+  S: 2, 
+  K: 3
+};
+
+function cardSort(a, b) {
+  const suitA = a[0];
+  const suitB = b[0];
+
+  const numA = Number(a.slice(1));
+  const numB = Number(b.slice(1));
+
+  if (suitOrder[suitA] !== suitOrder[suitB]) {
+    return suitOrder[suitA] - suitOrder[suitB];
+  }
+
+  return numA - numB;
+}
+
+
 
 const playersUi=document.getElementById("players-ui");
 const passBtn=document.getElementById("pass-btn");
@@ -407,16 +491,77 @@ function addChat(t){
 /* ===============================
    Result
 ================================ */
-function showResult(ranks){
-  const list=document.getElementById("result-list");
-  list.innerHTML="";
-  ranks.forEach((n,i)=>{
-    const li=document.createElement("li");
-    li.textContent=`${i+1}位：${n}`;
+
+function showResult(results) {
+  const list = document.getElementById("result-list");
+  list.innerHTML = "";
+
+  results.forEach(r => {
+    const li = document.createElement("li");
+
+    li.textContent = `${r.rank}位：${r.username}`;
+
+    if (r.delta !== 0 && r.delta !== null) {
+      const span = document.createElement("span");
+
+      if (r.delta > 0) {
+        span.textContent = ` +${r.delta}`;
+        span.className = "rating-plus";
+      } else {
+        span.textContent = ` ${r.delta}`;
+        span.className = "rating-minus";
+      }
+
+      li.appendChild(span);
+    }
+
     list.appendChild(li);
   });
-  document.getElementById("result-overlay").style.display="flex";
+
+  document.getElementById("result-overlay").style.display = "flex";
 }
+
+
+function showMessagePanel(title, messages) {
+  const overlay = document.getElementById("result-overlay");
+  const panel = document.getElementById("result-panel");
+  const list = document.getElementById("result-list");
+
+  panel.querySelector("h2").textContent = title;
+  list.innerHTML = "";
+
+  messages.forEach(text => {
+    const li = document.createElement("li");
+    li.textContent = text;
+    list.appendChild(li);
+  });
+
+  overlay.style.display = "flex";
+}
+
+
+
+//ロビーに戻るボタン
+function backToLobby() {
+  ws.send(JSON.stringify({
+    type: "back_to_lobby"
+  }));
+}
+
+
+//昇段
+function showPromotion(newDan) {
+  const overlay = document.getElementById("promotion-overlay");
+  const text = document.getElementById("promotion-text");
+
+  text.textContent = `昇段 ${newDan}`;
+  overlay.style.display = "flex";
+
+  setTimeout(() => {
+    overlay.style.display = "none";
+  }, 3000);
+}
+
 </script>
 
 </body>

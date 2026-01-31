@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Hex</title>
+
+<style>
+body{
+  background:#ddd;
+  text-align:center;
+}
+
+#boardWrapper{
+  display:inline-block;
+  transform: rotate(30deg);
+}
+
+#board{
+  position:relative;
+  width:900px;
+  height:700px;
+}
+
+.hex{
+  position:absolute;
+  cursor:pointer;
+}
+
+.player{ fill:#2d8cff; }
+.cpu{ fill:#ff4444; }
+
+</style>
+</head>
+<body>
+
+<h2>HEX</h2>
+
+<div id="boardWrapper">
+  <div id="board"></div>
+</div>
+
+<script>
+const SIZE = 11;
+const size = 30;
+
+const width  = size * 2;
+const height = Math.sqrt(3) * size;
+
+const boardDiv = document.getElementById("board");
+const board = [];
+const cells=[];
+
+function createHex(x,y,r,c){
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg","svg");
+  svg.setAttribute("width",width);
+  svg.setAttribute("height",height);
+  svg.classList.add("hex");
+
+  svg.style.left = x+"px";
+  svg.style.top  = y+"px";
+
+  /* ===== 頂点計算 ===== */
+
+  let pts = [];
+
+  for(let i=0;i<6;i++){
+    const angle = Math.PI/180 * (60*i);
+    const px = size + size*Math.cos(angle);
+    const py = height/2 + size*Math.sin(angle);
+    pts.push([px,py]);
+  }
+
+  /* ===== 六角形本体 ===== */
+
+  const poly = document.createElementNS("http://www.w3.org/2000/svg","polygon");
+
+  poly.setAttribute("points",pts.map(p=>p.join(",")).join(" "));
+  poly.setAttribute("fill","#fff");
+  poly.setAttribute("stroke","#888");
+
+  svg.appendChild(poly);
+
+  /* ===== 外周辺ライン ===== */
+
+  function drawEdge(i,color){
+
+    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+
+    const p1 = pts[i];
+    const p2 = pts[(i+1)%6];
+
+    line.setAttribute("x1",p1[0]);
+    line.setAttribute("y1",p1[1]);
+    line.setAttribute("x2",p2[0]);
+    line.setAttribute("y2",p2[1]);
+
+    line.setAttribute("stroke",color);
+    line.setAttribute("stroke-width","6");
+
+    svg.appendChild(line);
+  }
+
+  /* 上下（青） */
+  if(r===0) drawEdge(0,"#2d8cff");
+  if(r===SIZE-1) drawEdge(3,"#2d8cff");
+
+  /* 左右（赤） */
+  if(c===0){
+    drawEdge(4,"#ff4444");
+    drawEdge(5,"#ff4444");
+  }
+
+  if(c===SIZE-1){
+    drawEdge(1,"#ff4444");
+    drawEdge(2,"#ff4444");
+  }
+
+  svg.onclick = ()=>playerMove(r,c,poly);
+
+  boardDiv.appendChild(svg);
+
+  return poly;
+}
+
+function init(){
+
+  boardDiv.innerHTML="";
+  cells.length=0;
+
+  for(let r=0;r<SIZE;r++){
+
+    board[r]=[];
+
+    for(let c=0;c<SIZE;c++){
+
+      board[r][c]=0;
+
+      const x = c * (size * 1.5);
+      const y = r * height + (c % 2) * (height / 2);
+
+      const poly = createHex(x,y,r,c);
+
+      if(!cells[r]) cells[r]=[];
+      cells[r][c]=poly;
+    }
+  }
+}
+
+function playerMove(r,c,poly){
+
+  if(board[r][c]!==0) return;
+
+  board[r][c]=1;
+  poly.setAttribute("class","player");
+
+  if(checkWin(1)){
+    alert("青プレイヤー勝利");
+    init();
+    return;
+  }
+
+  cpuMove();
+}
+
+function cpuMove(){
+
+  let empty=[];
+
+  for(let r=0;r<SIZE;r++){
+    for(let c=0;c<SIZE;c++){
+      if(board[r][c]===0) empty.push([r,c]);
+    }
+  }
+
+  if(empty.length===0) return;
+
+  const [r,c]=empty[Math.floor(Math.random()*empty.length)];
+
+  board[r][c]=2;
+  cells[r][c].setAttribute("class","cpu");
+
+  if(checkWin(2)){
+    alert("赤CPU勝利");
+    init();
+  }
+}
+
+const dirs = [
+  [-1,0], [-1,1],
+  [0,-1], [0,1],
+  [1,-1], [1,0]
+];
+
+function checkWin(player){
+
+  const visited = Array.from({length:SIZE},()=>Array(SIZE).fill(false));
+  const stack=[];
+
+  if(player===1){
+
+    for(let c=0;c<SIZE;c++){
+      if(board[0][c]===1){
+        stack.push([0,c]);
+        visited[0][c]=true;
+      }
+    }
+
+    while(stack.length){
+
+      const [r,c]=stack.pop();
+      if(r===SIZE-1) return true;
+
+      for(const [dr,dc] of dirs){
+        const nr=r+dr;
+        const nc=c+dc;
+
+        if(nr>=0 && nr<SIZE && nc>=0 && nc<SIZE){
+          if(!visited[nr][nc] && board[nr][nc]===1){
+            visited[nr][nc]=true;
+            stack.push([nr,nc]);
+          }
+        }
+      }
+    }
+
+  }else{
+
+    for(let r=0;r<SIZE;r++){
+      if(board[r][0]===2){
+        stack.push([r,0]);
+        visited[r][0]=true;
+      }
+    }
+
+    while(stack.length){
+
+      const [r,c]=stack.pop();
+      if(c===SIZE-1) return true;
+
+      for(const [dr,dc] of dirs){
+        const nr=r+dr;
+        const nc=c+dc;
+
+        if(nr>=0 && nr<SIZE && nc>=0 && nc<SIZE){
+          if(!visited[nr][nc] && board[nr][nc]===2){
+            visited[nr][nc]=true;
+            stack.push([nr,nc]);
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+init();
+</script>
+</body>
+</html>

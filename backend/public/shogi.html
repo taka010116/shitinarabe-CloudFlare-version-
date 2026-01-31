@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ハサミ将棋</title>
+
+<style>
+body{
+  background:#ddd;
+  text-align:center;
+  font-family:sans-serif;
+}
+
+#game{
+  display:flex;
+  justify-content:center;
+  gap:20px;
+}
+
+#board{
+  width:540px;
+  display:grid;
+  grid-template-columns:repeat(9,60px);
+  grid-template-rows:repeat(9,60px);
+  gap:2px;
+}
+
+.hand{
+  width:120px;
+  min-height:540px;
+  background:#eee;
+  border:2px solid #444;
+  padding:10px;
+}
+
+.cell{
+  background:#f0d9b5;
+  border:1px solid #333;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+
+.move{ background:#9cff9c; }
+.selected{ outline:3px solid red; }
+
+.cell img{
+  width:45px;
+  pointer-events:none;
+}
+
+.rot{ transform:rotate(180deg); }
+
+#menu{
+  margin:20px;
+}
+</style>
+</head>
+
+<body>
+
+<h2>ハサミ将棋</h2>
+
+<div id="menu">
+難易度:
+<button onclick="startGame('easy')">初級</button>
+<button onclick="startGame('mid')">中級</button>
+<button onclick="startGame('hard')">上級</button>
+</div>
+
+<div id="turn"></div>
+
+<div id="game">
+
+<div>
+<h3>CPU</h3>
+<div id="hand_to" class="hand"></div>
+</div>
+
+<div id="board"></div>
+
+<div>
+<h3>あなた</h3>
+<div id="hand_hu" class="hand"></div>
+</div>
+
+</div>
+
+<script>
+const SIZE=9;
+
+let difficulty="easy";
+
+const boardDiv=document.getElementById("board");
+const turnText=document.getElementById("turn");
+const handHuDiv=document.getElementById("hand_hu");
+const handToDiv=document.getElementById("hand_to");
+
+let board=[];
+let turn="hu";
+let selected=null;
+let moves=[];
+let gameOver=false;
+
+let handHu=[];
+let handTo=[];
+
+/* ===== スタート ===== */
+function startGame(diff){
+  difficulty=diff;
+  document.getElementById("menu").style.display="none";
+  initBoard();
+  draw();
+}
+
+/* ===== 初期配置 ===== */
+function initBoard(){
+  board=[];
+  gameOver=false;
+  handHu=[];
+  handTo=[];
+  turn="hu";
+
+  for(let y=0;y<SIZE;y++){
+    board[y]=[];
+    for(let x=0;x<SIZE;x++){
+      if(y===0) board[y][x]="to";
+      else if(y===SIZE-1) board[y][x]="hu";
+      else board[y][x]=null;
+    }
+  }
+}
+
+/* ===== 描画 ===== */
+function draw(){
+  boardDiv.innerHTML="";
+
+  for(let y=0;y<SIZE;y++){
+    for(let x=0;x<SIZE;x++){
+
+      const cell=document.createElement("div");
+      cell.className="cell";
+
+      if(selected && selected.x===x && selected.y===y)
+        cell.classList.add("selected");
+
+      if(moves.some(m=>m.x===x && m.y===y))
+        cell.classList.add("move");
+
+      const p=board[y][x];
+
+      if(p){
+        const img=document.createElement("img");
+        img.src=p==="hu"?"images/hu.png":"images/to.png";
+        if(p==="to") img.classList.add("rot");
+        cell.appendChild(img);
+      }
+
+      cell.onclick=()=>playerClick(x,y);
+      boardDiv.appendChild(cell);
+    }
+  }
+
+  drawHand();
+  updateTurn();
+}
+
+function drawHand(){
+
+  handHuDiv.innerHTML="";
+  handHu.forEach(p=>{
+    const img=document.createElement("img");
+    img.src=p==="hu"?"images/hu.png":"images/to.png";
+    img.style.width="40px";
+    handHuDiv.appendChild(img);
+  });
+
+  handToDiv.innerHTML="";
+  handTo.forEach(p=>{
+    const img=document.createElement("img");
+    img.src=p==="hu"?"images/hu.png":"images/to.png";
+    img.style.width="40px";
+    img.classList.add("rot");
+    handToDiv.appendChild(img);
+  });
+}
+
+/* ===== プレイヤー操作 ===== */
+function playerClick(x,y){
+
+  if(gameOver || turn!=="hu") return;
+
+  if(!selected){
+    if(board[y][x]==="hu"){
+      selected={x,y};
+      moves=getMoves(board,x,y);
+      draw();
+    }
+    return;
+  }
+
+  if(moves.some(m=>m.x===x && m.y===y)){
+    doMove(board,selected.x,selected.y,x,y,true);
+    selected=null;
+    moves=[];
+    if(checkWin()) return;
+
+    turn="to";
+    draw();
+    setTimeout(cpuMove,300);
+    return;
+  }
+
+  if(board[y][x]==="hu"){
+    selected={x,y};
+    moves=getMoves(board,x,y);
+    draw();
+  }
+}
+
+/* ===== 移動処理 ===== */
+function doMove(b,sx,sy,tx,ty,real=false){
+
+  b[ty][tx]=b[sy][sx];
+  b[sy][sx]=null;
+
+  const taken=capture(b,tx,ty);
+
+  if(real){
+    taken.forEach(p=>{
+      if(b[ty][tx]==="hu") handHu.push(p);
+      else handTo.push(p);
+    });
+  }
+
+  return taken.length;
+}
+
+/* ===== 飛車移動 ===== */
+function getMoves(b,x,y){
+
+  let res=[];
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+
+  dirs.forEach(([dx,dy])=>{
+    let cx=x+dx;
+    let cy=y+dy;
+
+    while(cx>=0 && cx<SIZE && cy>=0 && cy<SIZE && b[cy][cx]===null){
+      res.push({x:cx,y:cy});
+      cx+=dx;
+      cy+=dy;
+    }
+  });
+
+  return res;
+}
+
+/* ===== 挟み取り ===== */
+function capture(b,x,y){
+
+  const self=b[y][x];
+  const enemy=self==="hu"?"to":"hu";
+  let result=[];
+
+  const dirs=[[1,0],[-1,0],[0,1],[0,-1]];
+
+  dirs.forEach(([dx,dy])=>{
+
+    let cx=x+dx;
+    let cy=y+dy;
+    let line=[];
+
+    while(cx>=0 && cx<SIZE && cy>=0 && cy<SIZE && b[cy][cx]===enemy){
+      line.push({x:cx,y:cy});
+      cx+=dx;
+      cy+=dy;
+    }
+
+    if(cx>=0 && cx<SIZE && cy>=0 && cy<SIZE && b[cy][cx]===self){
+      line.forEach(p=>{
+        result.push(b[p.y][p.x]);
+        b[p.y][p.x]=null;
+      });
+    }
+  });
+
+  return result;
+}
+
+/* =========================
+        CPU 分岐
+========================= */
+function cpuMove(){
+
+  if(difficulty==="easy") cpuRandom();
+  if(difficulty==="mid") cpuMid();
+  if(difficulty==="hard") cpuHard();
+
+  if(checkWin()) return;
+
+  turn="hu";
+  draw();
+}
+
+/* ===== 初級：完全ランダム ===== */
+function cpuRandom(){
+
+  let all=[];
+
+  board.forEach((row,y)=>{
+    row.forEach((p,x)=>{
+      if(p==="to"){
+        getMoves(board,x,y).forEach(m=>{
+          all.push({sx:x,sy:y,tx:m.x,ty:m.y});
+        });
+      }
+    });
+  });
+
+  const m=all[Math.floor(Math.random()*all.length)];
+  doMove(board,m.sx,m.sy,m.tx,m.ty,true);
+}
+
+/* ===== 中級 ===== */
+function cpuMid(){
+
+  let best=null;
+  let bestScore=-999;
+
+  board.forEach((row,y)=>{
+    row.forEach((p,x)=>{
+      if(p!=="to") return;
+
+      getMoves(board,x,y).forEach(m=>{
+
+        const temp=JSON.parse(JSON.stringify(board));
+        const gain=doMove(temp,x,y,m.x,m.y,false);
+
+        let enemyMax=0;
+
+        temp.forEach((r,py)=>{
+          r.forEach((pp,px)=>{
+            if(pp==="hu"){
+              getMoves(temp,px,py).forEach(pm=>{
+                const t2=JSON.parse(JSON.stringify(temp));
+                const loss=doMove(t2,px,py,pm.x,pm.y,false);
+                enemyMax=Math.max(enemyMax,loss);
+              });
+            }
+          });
+        });
+
+        const score=gain*10-enemyMax;
+
+        if(score>bestScore){
+          bestScore=score;
+          best={sx:x,sy:y,tx:m.x,ty:m.y};
+        }
+      });
+    });
+  });
+
+  doMove(board,best.sx,best.sy,best.tx,best.ty,true);
+}
+
+/* ===== 上級：ミニマックス ===== */
+function cpuHard(){
+
+  let best=null;
+  let bestScore=-9999;
+
+  getAllMoves(board,"to").forEach(m=>{
+    const temp=JSON.parse(JSON.stringify(board));
+    doMove(temp,m.sx,m.sy,m.tx,m.ty,false);
+
+    const score=minimax(temp,2,false);
+
+    if(score>bestScore){
+      bestScore=score;
+      best=m;
+    }
+  });
+
+  doMove(board,best.sx,best.sy,best.tx,best.ty,true);
+}
+
+function minimax(b,depth,isMax){
+
+  if(depth===0) return evaluate(b);
+
+  const side=isMax?"to":"hu";
+  const moves=getAllMoves(b,side);
+
+  if(isMax){
+    let max=-9999;
+    moves.forEach(m=>{
+      const t=JSON.parse(JSON.stringify(b));
+      doMove(t,m.sx,m.sy,m.tx,m.ty,false);
+      max=Math.max(max,minimax(t,depth-1,false));
+    });
+    return max;
+  }
+  else{
+    let min=9999;
+    moves.forEach(m=>{
+      const t=JSON.parse(JSON.stringify(b));
+      doMove(t,m.sx,m.sy,m.tx,m.ty,false);
+      min=Math.min(min,minimax(t,depth-1,true));
+    });
+    return min;
+  }
+}
+
+function evaluate(b){
+
+  let hu=0,to=0;
+
+  b.forEach(r=>{
+    r.forEach(p=>{
+      if(p==="hu") hu++;
+      if(p==="to") to++;
+    });
+  });
+
+  return to-hu;
+}
+
+function getAllMoves(b,side){
+
+  let list=[];
+
+  b.forEach((row,y)=>{
+    row.forEach((p,x)=>{
+      if(p===side){
+        getMoves(b,x,y).forEach(m=>{
+          list.push({sx:x,sy:y,tx:m.x,ty:m.y});
+        });
+      }
+    });
+  });
+
+  return list;
+}
+
+/* ===== 勝敗 ===== */
+function checkWin(){
+
+  let hu=0,to=0;
+
+  board.forEach(r=>{
+    r.forEach(p=>{
+      if(p==="hu") hu++;
+      if(p==="to") to++;
+    });
+  });
+
+  if(hu<=3){ alert("あなたの負け"); gameOver=true; return true;}
+  if(to<=3){ alert("あなたの勝ち"); gameOver=true; return true;}
+
+  return false;
+}
+
+function updateTurn(){
+  turnText.textContent =
+    turn==="hu"?"あなたの番":"CPU思考中";
+}
+</script>
+
+</body>
+</html>

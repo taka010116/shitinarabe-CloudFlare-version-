@@ -18,6 +18,22 @@
     width: 100%;
     height: 80px;
   }
+  
+.container {
+  display: flex;
+  gap: 24px;
+}
+
+.profile {
+  flex: 2;
+}
+
+.search {
+  flex: 1;
+  border: 1px solid #ccc;
+  padding: 16px;
+  height: fit-content;
+}
 </style>
 </head>
 <body>
@@ -48,105 +64,165 @@
 <button onclick="location.href='/match.html'">
   対局開始
 </button>
+<button onclick="goTitle()">
+  タイトルへ戻る
+</button>
+
+<div class="search">
+    <h3>ユーザー検索</h3>
+    <input id="searchName" placeholder="ユーザー名">
+    <button onclick="searchUser()">検索</button>
+    <p id="searchInfo"></p>
+    <input id="searchName" placeholder="ユーザー名" oninput="searchUserSuggest()">
+    <div id="suggestList" style="border:1px solid #ccc;"></div>
+  </div>
+
 
 <script>
-const API_BASE = "https://my-worker.6322052.workers.dev";
+let socket;
+let viewingUser;
+let searchTimer = null;
 
-/* =========================
-   ログインチェック
-========================= */
+function searchUserSuggest() {
+  const keyword = document.getElementById("searchName").value.trim();
+  if (keyword.length === 0) {
+    document.getElementById("suggestList").innerHTML = "";
+    return;
+  }
+
+  // 入力中の無駄な連打防止（超重要）
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => {
+    socket.send(JSON.stringify({
+      type: "search_user",
+      keyword
+    }));
+  }, 300);
+}
+
+function renderSuggest(users) {
+  const list = document.getElementById("suggestList");
+  list.innerHTML = "";
+
+  users.forEach(name => {
+    const div = document.createElement("div");
+    div.textContent = name;
+    div.style.cursor = "pointer";
+    div.style.padding = "4px";
+
+    div.onclick = () => {
+      socket.send(JSON.stringify({
+        type: "get_profile",
+        username: name
+      }));
+      list.innerHTML = "";
+      document.getElementById("searchName").value = name;
+    };
+
+    list.appendChild(div);
+  });
+}
+
+
+
+/* ===== ログインチェック ===== */
 const userStr = localStorage.getItem("user");
 if (!userStr) {
   location.href = "/login.html";
 }
+const loginUser = JSON.parse(userStr);
+viewingUser = loginUser.username;
 
-const cachedUser = JSON.parse(userStr);
+/* ===== WebSocket 接続 ===== */
+function connectSocket() {
+  socket = new WebSocket("wss://shitinarabeserver.com");
 
-/* =========================
-   最新プロフィール取得
-========================= */
-async function loadProfile() {
-  try {
-    const res = await fetch(
-      `${API_BASE}/api/profile?username=${encodeURIComponent(cachedUser.username)}`
-    );
+  socket.onopen = () => {
+    socket.send(JSON.stringify({
+      type: "get_profile",
+      username: loginUser.username
+    }));
+  };
 
-    if (!res.ok) {
-      throw new Error("profile fetch failed");
+  socket.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+
+    if (data.type === "profile") {
+      renderProfile(data.user);
     }
 
-    const user = await res.json();
-
-    // 表示更新
-    document.getElementById("username").textContent = user.username;
-    document.getElementById("rating").textContent = user.rating;
-    document.getElementById("dan").textContent = user.dan;
-
-    document.getElementById("win1").textContent = user.win1 ?? 0;
-    document.getElementById("win2").textContent = user.win2 ?? 0;
-    document.getElementById("win3").textContent = user.win3 ?? 0;
-    document.getElementById("win4").textContent = user.win4 ?? 0;
-
-    document.getElementById("comment").value = user.comment || "";
-
-    // localStorage を最新状態に更新
-    localStorage.setItem("user", JSON.stringify(user));
-
-  } catch (e) {
-    console.error(e);
-    alert("プロフィール取得に失敗しました");
-  }
-}
-
-// ページ表示時に必ず最新データを取得
-loadProfile();
-
-/* =========================
-   コメント保存
-========================= */
-async function saveComment() {
-  const newComment = document.getElementById("comment").value;
-
-  try {
-    const res = await fetch(API_BASE + "/api/comment", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        username: cachedUser.username,
-        comment: newComment
-      })
-    });
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      alert(data.error || "保存失敗");
-      return;
+    if (data.type === "error") {
+      alert(data.message);
+    }
+    if (data.type === "search_result") {
+      renderSuggest(data.users);
     }
 
-    // localStorage も更新
-    const user = JSON.parse(localStorage.getItem("user"));
-    user.comment = newComment;
-    localStorage.setItem("user", JSON.stringify(user));
+    if (data.type === "profile") {
+      renderProfile(data.user);
+    }
 
-    alert("コメントを保存しました");
-
-  } catch (e) {
-    console.error(e);
-    alert("通信エラー");
-  }
+  };
 }
 
-/* =========================
-   ログアウト
-========================= */
+/* ===== 表示 ===== */
+function renderProfile(p) {
+  viewingUser = p.username;
+
+  document.getElementById("username").textContent = p.username;
+  document.getElementById("rating").textContent = p.rating;
+  document.getElementById("dan").textContent = p.dan;
+
+  document.getElementById("win1").textContent = p.win_1st;
+  document.getElementById("win2").textContent = p.win_2nd;
+  document.getElementById("win3").textContent = p.win_3rd;
+  document.getElementById("win4").textContent = p.win_4th;
+
+  document.getElementById("comment").value = p.comment || "";
+
+  const isSelf = (p.username === loginUser.username);
+
+  document.getElementById("comment").disabled = !isSelf;
+  document.getElementById("searchInfo").textContent =
+    isSelf ? "" : "※ 閲覧専用プロフィールです";
+}
+
+/* ===== コメント保存 ===== */
+function saveComment() {
+  const comment = document.getElementById("comment").value;
+
+  socket.send(JSON.stringify({
+    type: "save_comment",
+    username: loginUser.username,
+    comment
+  }));
+}
+
+/* ===== ログアウト ===== */
 function logout() {
   localStorage.removeItem("user");
   location.href = "/login.html";
 }
+
+function goTitle() {
+  location.href = "/title.html";
+}
+
+/* ===== ユーザー検索 ===== */
+function searchUser() {
+  const name = document.getElementById("searchName").value.trim();
+  if (!name) return;
+
+  socket.send(JSON.stringify({
+    type: "get_profile",
+    username: name
+  }));
+}
+
+connectSocket();
 </script>
+
+
 
 </body>
 </html>
